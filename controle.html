@@ -12,23 +12,17 @@
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #fff; padding: 15px; margin: 0; }
         
-        /* Card de Conexão (Inicial) */
-        #connection-setup {
-            background: #1e1e1e; padding: 25px; border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5); text-align: center; margin-bottom: 20px;
-        }
-        
-        /* Cartão de Controle (Após Conectar) */
-        .remote-card {
+        .card {
             background: #1e1e1e; padding: 20px; border-radius: 15px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5); text-align: center; margin-bottom: 20px;
         }
         
         h2 { margin-top: 0; color: #007bff; }
         
-        /* Botões Principais */
+        /* Controles de Mídia */
         .controls { display: flex; justify-content: center; gap: 20px; margin: 20px 0; }
-        
+        .controls-row { display: flex; justify-content: space-around; margin-bottom: 15px; }
+
         .btn-round {
             width: 60px; height: 60px; border-radius: 50%; border: none;
             background: #333; color: white; font-size: 24px; cursor: pointer;
@@ -36,8 +30,9 @@
         }
         .btn-round:active { transform: scale(0.9); }
         .btn-play { background: #007bff; width: 70px; height: 70px; font-size: 30px; }
+        .btn-small { width: 45px; height: 45px; font-size: 18px; }
 
-        /* Input */
+        /* Input e Botões de Ação */
         input { 
             width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #444; 
             background: #2a2a2a; color: white; margin-bottom: 10px; box-sizing: border-box; 
@@ -49,6 +44,17 @@
         }
         .btn-action:hover { background: #218838; }
 
+        /* Sliders */
+        input[type="range"] { 
+            width: 80%; margin: 10px 0;
+            -webkit-appearance: none; appearance: none;
+            background: #333; height: 8px; border-radius: 5px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none;
+            width: 20px; height: 20px; background: #007bff; border-radius: 50%; cursor: pointer;
+        }
+
         /* Playlist */
         #playlist { list-style: none; padding: 0; text-align: left; }
         #playlist li {
@@ -56,32 +62,50 @@
             display: flex; justify-content: space-between; align-items: center;
             margin-bottom: 5px; border-radius: 5px;
         }
-        #playlist li.active { border-left: 4px solid #007bff; background: #333; }
+        #playlist li.active { border-left: 4px solid #ff9068; background: #333; }
         
         .del-btn { background: none; border: none; color: #ff4444; cursor: pointer; font-size: 1.2em; }
-        .del-btn:active { transform: scale(0.9); }
-        
         .hidden { display: none !important; }
         
-        /* Botão Sair/Voltar */
-        #disconnect-btn { 
-            background: #dc3545; color: white; padding: 10px; border-radius: 8px; 
-            margin-top: 15px; font-weight: bold; cursor: pointer; width: 100%; border: none;
+        /* Modal (Pop-up de Playlist e Seleção de TV) */
+        .modal {
+            position: fixed; z-index: 10001; left: 0; top: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.8); display: none; justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background: #1e1e1e; padding: 30px; border-radius: 15px; width: 80%; max-width: 400px;
+            text-align: left; position: relative;
+        }
+        .modal-content button { margin-top: 10px; }
+        
+        /* Lista de TVs */
+        #tv-list button {
+            width: 100%; text-align: left; padding: 10px; margin-bottom: 8px;
+            background: #333; color: white; border: none; border-radius: 5px; cursor: pointer;
         }
     </style>
 </head>
 <body>
 
-    <div id="connection-setup">
+    <div id="connection-setup" class="card">
         <h2>Conectar ao Stream TV</h2>
-        <p style="color: #ccc;">Insira a chave de 6 dígitos gerada pelo Tablet (Modo TV):</p>
-        <input type="text" id="keyInput" placeholder="Ex: A1B2C3" maxlength="6" style="text-transform: uppercase;">
-        <button class="btn-action" onclick="connectToTV()">Conectar</button>
-        <p id="connection-status" style="color: #ffc107; margin-top: 10px;"></p>
+        <p id="connection-status" style="color: #ffc107; margin-top: 10px;">Buscando TVs ativas...</p>
+        
+        <div id="manual-key-entry">
+            <p style="color: #ccc; margin-top: 20px;">Ou insira a chave manualmente:</p>
+            <input type="text" id="keyInput" placeholder="Ex: A1B2C3" maxlength="6" style="text-transform: uppercase;">
+            <button class="btn-action" onclick="connectToTV(document.getElementById('keyInput').value)">Conectar Manualmente</button>
+        </div>
+        
+        <div id="tv-selection-area" class="hidden">
+            <p style="color: #ccc; margin-top: 20px;">Múltiplas TVs encontradas. Selecione:</p>
+            <div id="tv-list"></div>
+        </div>
     </div>
 
     <div id="remote-control-area" class="hidden">
-        <div class="remote-card">
+        
+        <div class="card">
             <h2 id="connected-key">Conectado à [KEY]</h2>
             <div id="now-playing" style="color: #aaa; margin-bottom: 15px; font-style: italic;">
                 Nenhum vídeo selecionado
@@ -93,116 +117,231 @@
                 <button class="btn-round" onclick="nextVideo()"><i class="fas fa-step-forward"></i></button>
             </div>
             
-            <button id="disconnect-btn" onclick="disconnect()">Desconectar</button>
+            <div class="controls-row">
+                <button class="btn-round btn-small" onclick="adjustVolume(-0.1)" title="Volume Baixo"><i class="fas fa-volume-down"></i></button>
+                <button class="btn-round btn-small" onclick="adjustVolume(0.1)" title="Volume Alto"><i class="fas fa-volume-up"></i></button>
+                <button class="btn-round btn-small" onclick="adjustBrightness(-0.1)" title="Brilho Baixo"><i class="fas fa-sun"></i>-</button>
+                <button class="btn-round btn-small" onclick="adjustBrightness(0.1)" title="Brilho Alto"><i class="fas fa-sun"></i>+</button>
+            </div>
+
+            <button class="btn-action" style="background: #dc3545;" onclick="clearVideo()">
+                <i class="fas fa-times-circle"></i> Sair do Vídeo / Limpar Player
+            </button>
         </div>
 
-        <div class="remote-card">
+        <div class="card">
             <h3>Adicionar Vídeo</h3>
-            <input type="text" id="urlInput" placeholder="Link (YouTube ou MP4)">
+            <input type="text" id="urlInput" placeholder="Link (YouTube, Playlist ou MP4)">
             <input type="text" id="titleInput" placeholder="Título (Opcional)">
-            <button class="btn-action" onclick="addVideo()">Enviar para TV 🚀</button>
+            <button class="btn-action" onclick="checkAndAddVideo()">Enviar para TV 🚀</button>
         </div>
 
         <h3 style="margin-left: 10px;">Fila de Reprodução</h3>
         <ul id="playlist"></ul>
+        
+        <button id="disconnect-btn" onclick="disconnect()" style="width: 100%; background: #6c757d; border: none; padding: 10px; border-radius: 8px;">
+            Desconectar e Voltar ao Menu
+        </button>
     </div>
+
+    <div id="playlist-modal" class="modal">
+        <div class="modal-content">
+            <h3>⚠️ Link de Playlist Detectado</h3>
+            <p>Este link parece ser uma playlist. Deseja:</p>
+            <button class="btn-action" style="width: 100%; background: #007bff;" onclick="handlePlaylistOption('first')">
+                <i class="fas fa-video"></i> Adicionar APENAS o primeiro vídeo
+            </button>
+            <button class="btn-action" style="width: 100%; background: #6c757d; margin-top: 10px;" onclick="handlePlaylistOption('cancel')">
+                <i class="fas fa-times"></i> Cancelar e Inserir Outro Link
+            </button>
+            <p style="font-size: 0.8em; color: #aaa; margin-top: 15px;">*A API do YouTube não permite extrair a playlist completa sem chaves de API complexas.</p>
+        </div>
+    </div>
+    
+    <div id="tv-select-modal" class="modal">
+        <div class="modal-content">
+            <h3>Múltiplas TVs Ativas!</h3>
+            <p>Selecione o dispositivo que você deseja controlar:</p>
+            <div id="modal-tv-list"></div>
+        </div>
+    </div>
+
 
     <script>
         // --- 1. COLE SUA CONFIGURAÇÃO DO FIREBASE AQUI ---
         const firebaseConfig = {
-  apiKey: "AIzaSyBv62mYzTKqCTqo-Kfw5ds-GEk67L7_8-I",
-  authDomain: "sdfc-c1b59.firebaseapp.com",
-  projectId: "sdfc-c1b59",
-  storageBucket: "sdfc-c1b59.firebasestorage.app",
-  messagingSenderId: "799347293922",
-  appId: "1:799347293922:web:df6a9a6f76fcf2bbc9e8bb",
-  measurementId: "G-J91HPQWH8F"
-};
+            apiKey: "SUA_API_KEY",
+            authDomain: "SEU_PROJETO.firebaseapp.com",
+            databaseURL: "https://SEU_PROJETO-default-rtdb.firebaseio.com",
+            projectId: "SEU_PROJETO",
+            storageBucket: "SEU_PROJETO.appspot.com",
+            messagingSenderId: "NUMERO",
+            appId: "ID"
+        };
         // --------------------------------------------------
 
         firebase.initializeApp(firebaseConfig);
-        let dbRef; // Referência dinâmica ao Firebase
+        const dbRoot = firebase.database().ref('sessions');
+        let dbRef; // Referência dinâmica à sessão da TV
         let keyInput = document.getElementById('keyInput');
 
         let playlist = [];
         let currentState = { index: 0, isPlaying: false };
+        let currentMediaControls = { volume: 0.5, brightness: 1.0 }; // Padrão
         let currentKey = localStorage.getItem('remote_connection_key');
         
+        // --- Funções de Conexão e Inicialização ---
+        
         document.addEventListener('DOMContentLoaded', () => {
+            // Se tiver uma chave salva, tenta conectar diretamente
             if (currentKey) {
-                keyInput.value = currentKey;
                 connectToTV(currentKey);
+            } else {
+                // Se não, busca TVs ativas
+                searchActiveTVs();
             }
         });
 
-        function connectToTV(key = null) {
-            const finalKey = (key || keyInput.value).trim().toUpperCase();
-            const status = document.getElementById('connection-status');
-            
+        function searchActiveTVs() {
+            document.getElementById('connection-status').innerText = 'Buscando TVs ativas...';
+            dbRoot.once('value', (snapshot) => {
+                const sessions = snapshot.val();
+                if (!sessions) {
+                    document.getElementById('connection-status').innerText = 'Nenhuma TV ativa encontrada. Use a chave manual abaixo.';
+                    return;
+                }
+                
+                const activeTVs = [];
+                for (const key in sessions) {
+                    // Simples filtro de TVs que não foram "removidas" pelo onDisconnect
+                    if (sessions[key].metadata && sessions[key].metadata.name) {
+                        activeTVs.push({ key: key, name: sessions[key].metadata.name });
+                    }
+                }
+                
+                if (activeTVs.length === 0) {
+                    document.getElementById('connection-status').innerText = 'Nenhuma TV ativa encontrada. Use a chave manual abaixo.';
+                } else if (activeTVs.length === 1) {
+                    // Conexão Automática!
+                    document.getElementById('connection-status').innerText = `TV única encontrada: ${activeTVs[0].name}. Conectando...`;
+                    connectToTV(activeTVs[0].key);
+                } else {
+                    // Múltiplas TVs
+                    showTVSelection(activeTVs);
+                }
+            });
+        }
+        
+        function showTVSelection(tvs) {
+            const listContainer = document.getElementById('modal-tv-list');
+            listContainer.innerHTML = '';
+            tvs.forEach(tv => {
+                const btn = document.createElement('button');
+                btn.innerText = tv.name;
+                btn.onclick = () => {
+                    document.getElementById('tv-select-modal').style.display = 'none';
+                    connectToTV(tv.key);
+                };
+                listContainer.appendChild(btn);
+            });
+            document.getElementById('tv-select-modal').style.display = 'flex';
+        }
+
+        function connectToTV(key) {
+            const finalKey = key.trim().toUpperCase();
             if (finalKey.length !== 6) {
-                status.innerText = '⚠️ A chave deve ter 6 caracteres.';
+                document.getElementById('connection-status').innerText = '⚠️ A chave deve ter 6 caracteres.';
                 return;
             }
             
-            // Define o caminho no Firebase com a chave do usuário
-            dbRef = firebase.database().ref(`sessions/${finalKey}`);
+            dbRef = dbRoot.child(finalKey);
             
-            // Tenta escrever para verificar se a chave existe ou é válida (no modo teste)
-            dbRef.child('status/connected').set(true).then(() => {
+            // Verifica se a chave existe (pelo menos a pasta metadata)
+            dbRef.child('metadata/name').once('value', (snapshot) => {
+                if (!snapshot.exists()) {
+                     document.getElementById('connection-status').innerText = `❌ TV com chave ${finalKey} não está ativa. Tente novamente.`;
+                     return;
+                }
+                
                 localStorage.setItem('remote_connection_key', finalKey);
                 document.getElementById('connection-setup').classList.add('hidden');
                 document.getElementById('remote-control-area').classList.remove('hidden');
-                document.getElementById('connected-key').innerText = `Conectado à: ${finalKey}`;
+                document.getElementById('connected-key').innerText = `Conectado à: ${snapshot.val()}`;
                 setupListeners();
-            }).catch(error => {
-                status.innerText = `❌ Erro de Conexão: ${error.message}`;
             });
         }
         
         function disconnect() {
             localStorage.removeItem('remote_connection_key');
-            window.location.reload(); // Recarrega para voltar ao setup
+            // Remove os listeners antigos antes de recarregar
+            if (dbRef) dbRef.off(); 
+            window.location.href = 'index.html';
         }
 
-        // --- LÓGICA DE SINCRONIZAÇÃO ---
+        // --- LÓGICA DE PLAYLIST E VÍDEO ---
         
-        function setupListeners() {
-            // 1. Atualiza a Playlist na tela do celular
-            dbRef.child('playlist').on('value', (snapshot) => {
-                playlist = snapshot.val() || [];
-                renderPlaylist();
-            });
+        // Tolerância melhorada para YouTube, verificando playlists
+        const isPlaylist = (url) => url.includes('list=');
 
-            // 2. Atualiza os botões (se alguém pausar na TV, atualiza o celular)
-            dbRef.child('state').on('value', (snapshot) => {
-                currentState = snapshot.val() || { index: 0, isPlaying: false };
-                updateUI();
-            });
+        const getYouTubeId = (url) => {
+            if (!url) return null;
+            // Captura ID de watch, v, youtu.be, shorts (o mesmo do tv.html)
+            const regExp = /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.*&v=|shorts\/|playlist\?list=|embed\/videoseries\?list=))([^&?#]+)/;
+            const match = url.match(regExp);
+            return (match && match[1].length === 11) ? match[1] : null;
+        };
 
-            // 3. Escuta se o vídeo acabou na TV para pular automaticamente
-            dbRef.child('status/ended').on('value', (snapshot) => {
-                if(snapshot.val()) nextVideo(false); // Não força o play se já tiver terminado
-            });
-        }
-
-        // --- FUNÇÕES DE COMANDO ---
-
-        function addVideo() {
+        function checkAndAddVideo() {
             const url = document.getElementById('urlInput').value.trim();
-            const title = document.getElementById('titleInput').value.trim() || `Vídeo ${playlist.length + 1}`;
-            
-            if(!url) return alert("Insira um link!");
+            if (!url) return alert("Insira um link!");
 
+            if (isPlaylist(url)) {
+                // Abre o pop-up de playlist
+                document.getElementById('playlist-modal').style.display = 'flex';
+            } else {
+                // Adiciona vídeo normal
+                const title = document.getElementById('titleInput').value.trim() || `Vídeo ${playlist.length + 1}`;
+                addVideoToPlaylist(url, title);
+            }
+        }
+        
+        window.handlePlaylistOption = (option) => {
+            const url = document.getElementById('urlInput').value.trim();
+            document.getElementById('playlist-modal').style.display = 'none';
+
+            if (option === 'first') {
+                const ytId = getYouTubeId(url);
+                if (ytId) {
+                    const videoUrl = `https://www.youtube.com/watch?v=${ytId}`;
+                    const title = document.getElementById('titleInput').value.trim() || `Playlist: Primeiro Vídeo`;
+                    addVideoToPlaylist(videoUrl, title);
+                } else {
+                    alert("Não foi possível extrair um ID de vídeo válido da URL da playlist.");
+                }
+            } else {
+                document.getElementById('urlInput').value = '';
+                document.getElementById('titleInput').value = '';
+            }
+        };
+
+        function addVideoToPlaylist(url, title) {
             const newPlaylist = [...playlist, { url, title }];
             dbRef.child('playlist').set(newPlaylist);
             
-            // Se for o primeiro vídeo, dá play e carrega o estado
             if(playlist.length === 0) {
                 dbRef.child('state').set({ index: 0, isPlaying: true });
             }
 
             document.getElementById('urlInput').value = '';
             document.getElementById('titleInput').value = '';
+        }
+
+        // --- FUNÇÕES DE COMANDO (TELA) ---
+
+        function clearVideo() {
+            if (confirm('Tem certeza que deseja limpar o player na TV?')) {
+                 dbRef.child('state').set({ index: 0, isPlaying: false, clear: true });
+            }
         }
 
         function togglePlay() {
@@ -217,37 +356,53 @@
             }
         }
 
-        function nextVideo(forcePlay = true) {
+        function nextVideo() {
             if(currentState.index < playlist.length - 1) {
-                dbRef.child('state').set({ index: currentState.index + 1, isPlaying: forcePlay });
-            } else if (forcePlay) {
-                // Reinicia a playlist (opcional, mas útil)
-                dbRef.child('state').set({ index: 0, isPlaying: true });
+                dbRef.child('state').set({ index: currentState.index + 1, isPlaying: true });
+            } else {
+                // Reinicia a playlist
+                dbRef.child('state').set({ index: 0, isPlaying: false });
             }
         }
-
-        window.playSpecific = (index) => {
-            dbRef.child('state').set({ index: index, isPlaying: true });
+        
+        // --- FUNÇÕES DE COMANDO (MÍDIA) ---
+        
+        function adjustVolume(delta) {
+            currentMediaControls.volume = Math.max(0, Math.min(1, currentMediaControls.volume + delta));
+            dbRef.child('mediaControls/volume').set(currentMediaControls.volume);
+        }
+        
+        function adjustBrightness(delta) {
+            currentMediaControls.brightness = Math.max(0.3, Math.min(1.0, currentMediaControls.brightness + delta));
+            dbRef.child('mediaControls/brightness').set(currentMediaControls.brightness);
         }
 
-        window.deleteVideo = (index) => {
-            if(confirm('Remover vídeo?')) {
-                const newPlaylist = playlist.filter((_, i) => i !== index);
-                dbRef.child('playlist').set(newPlaylist);
-                
-                // Ajusta índice
-                let newIndex = currentState.index;
-                if (index < currentState.index) {
-                    newIndex = currentState.index - 1;
-                } else if (index === currentState.index) {
-                     newIndex = newPlaylist.length > 0 ? 0 : 0;
-                     dbRef.child('state').set({ index: newIndex, isPlaying: newPlaylist.length > 0 ? false : false });
-                     return;
-                }
-                dbRef.child('state/index').set(newIndex);
-            }
-        }
+        // --- OUVINTES DO FIREBASE ---
+        
+        function setupListeners() {
+            // Atualiza a Playlist na tela do celular
+            dbRef.child('playlist').on('value', (snapshot) => {
+                playlist = snapshot.val() || [];
+                renderPlaylist();
+            });
 
+            // Atualiza os botões (estado de Play/Pause e índice)
+            dbRef.child('state').on('value', (snapshot) => {
+                currentState = snapshot.val() || { index: 0, isPlaying: false };
+                updateUI();
+            });
+
+            // Escuta se o vídeo acabou na TV para pular automaticamente
+            dbRef.child('status/ended').on('value', (snapshot) => {
+                if(snapshot.val() && currentState.isPlaying) nextVideo();
+            });
+
+            // Sincroniza o estado de volume/brilho no controle
+            dbRef.child('mediaControls').on('value', (snapshot) => {
+                 currentMediaControls = snapshot.val() || { volume: 0.5, brightness: 1.0 };
+            });
+        }
+        
         // --- RENDERIZAÇÃO ---
 
         function updateUI() {
@@ -265,7 +420,7 @@
             } else {
                 document.getElementById('now-playing').innerText = "Aguardando...";
             }
-            renderPlaylist(); // Para atualizar a classe 'active'
+            renderPlaylist(); 
         }
 
         function renderPlaylist() {
@@ -284,6 +439,26 @@
                 `;
                 ul.appendChild(li);
             });
+        }
+        
+        window.playSpecific = (index) => dbRef.child('state').set({ index: index, isPlaying: true });
+        
+        window.deleteVideo = (index) => {
+            // Implementação da exclusão... (Mantida a mesma lógica anterior, apenas envolta em 'window')
+             if(confirm('Remover vídeo?')) {
+                const newPlaylist = playlist.filter((_, i) => i !== index);
+      dbRef.child('playlist').set(newPlaylist);
+                
+                let newIndex = currentState.index;
+                if (index < currentState.index) {
+                    newIndex = currentState.index - 1;
+                } else if (index === currentState.index) {
+                     newIndex = newPlaylist.length > 0 ? 0 : 0;
+                     dbRef.child('state').set({ index: newIndex, isPlaying: newPlaylist.length > 0 ? false : false });
+                     return;
+                }
+                dbRef.child('state/index').set(newIndex);
+            }
         }
     </script>
 </body>
