@@ -11,7 +11,6 @@
         /* O Player ocupa a tela toda */
         #video-container { 
             width: 100%; height: 100%; position: relative; 
-            /* Aplica o filtro de brilho controlado pelo JS/Firebase */
             filter: brightness(100%); 
             transition: filter 0.5s; 
         }
@@ -51,9 +50,9 @@
 
     <div id="connection-overlay">
         <h1>Stream TV Mode 📺</h1>
-        <p>Aguardando Conexão do Controle. Use esta chave:</p>
-        <span id="connection-key" title="Clique para Copiar">000000</span>
-        <p id="connection-info">Cole esta chave no aplicativo Controle (Celular)</p>
+        <p>A TV está no ar. Use o nome abaixo no controle:</p>
+        <span id="connection-key" title="Clique para Copiar">MY-TV-DEDICADA</span>
+        <p id="connection-info">Este é o nome fixo da sua TV. Clique para copiar.</p>
     </div>
 
     <div id="video-container">
@@ -81,38 +80,25 @@
         firebase.initializeApp(firebaseConfig);
         let db;
 
+        // --- MUDANÇA: CHAVE FIXA PARA ESTABILIDADE ---
+        const connectionKey = "MY-TV-DEDICADA"; 
+        
         // Variáveis e Elementos
-        let player; // YT Player object
+        let player; 
         const localPlayer = document.getElementById('local-video-player');
         const videoContainer = document.getElementById('video-container');
         let isYTReady = false;
         let currentPlaylist = [];
-        let connectionKey = localStorage.getItem('tv_connection_key') || generateKey();
         
-        // Funções de Inicialização
-        
-        function generateKey() {
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-            let result = '';
-            for (let i = 0; i < 6; i++) {
-                result += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
-            return result;
-        }
-
         // Configurações de Conexão
-        localStorage.setItem('tv_connection_key', connectionKey);
         document.getElementById('connection-key').innerText = connectionKey;
         db = firebase.database().ref(`sessions/${connectionKey}`);
         
-        // Registra a TV como ativa e o nome para o controle
+        // Registra a TV como ativa com um nome amigável
         db.child('metadata').set({
-            name: `Tablet TV (${connectionKey})`,
+            name: `Stream TV Dedicada`,
             lastSeen: Date.now()
         });
-
-        // Remove a sessão do Firebase quando a página é fechada (melhoria)
-        db.onDisconnect().remove();
 
         // --- FUNÇÕES YOUTUBE API ---
         
@@ -123,11 +109,10 @@
                 events: {
                     'onReady': () => { 
                         isYTReady = true; 
-                        setupListeners(); // Começa a escutar após o player estar pronto
+                        setupListeners();
                     },
                     'onStateChange': (e) => {
                         if(e.data === YT.PlayerState.ENDED) db.child('status/ended').set(Date.now());
-                        // Avisa o controle sobre o estado de pausa (para sincronizar o ícone)
                         if(e.data === YT.PlayerState.PLAYING) db.child('state/isPlaying').set(true);
                         if(e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.BUFFERING) db.child('state/isPlaying').set(false);
                     }
@@ -135,13 +120,10 @@
             });
         };
 
-        // Tolerância melhorada para YouTube
         const getYouTubeId = (url) => {
             if (!url) return null;
-            // Padrão que captura ID de watch, v, youtu.be, shorts e até de playlists (apenas o primeiro vídeo)
             const regExp = /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.*&v=|shorts\/|playlist\?list=|embed\/videoseries\?list=))([^&?#]+)/;
             const match = url.match(regExp);
-            // Verifica se é um ID de vídeo válido (11 caracteres)
             return (match && match[1].length === 11) ? match[1] : null;
         };
         
@@ -163,7 +145,7 @@
                 
                 // --- Ação de Sair do Vídeo / Limpar ---
                 if (state.clear) {
-                    player.stopVideo();
+                    if(isYTReady) player.stopVideo();
                     localPlayer.src = "";
                     document.getElementById('youtube-player').classList.add('hidden');
                     localPlayer.classList.add('hidden');
@@ -173,7 +155,7 @@
 
                 if (currentPlaylist.length === 0) return;
 
-                // Tenta entrar em fullscreen e desbloquear áudio (requer interação)
+                // Tenta entrar em fullscreen
                 try { 
                     if (document.fullscreenElement === null) document.body.requestFullscreen(); 
                 } catch(e){}
@@ -184,7 +166,6 @@
                 const ytId = getYouTubeId(videoData.url);
 
                 if (ytId) {
-                    // Tocar YouTube
                     localPlayer.classList.add('hidden');
                     localPlayer.pause();
                     document.getElementById('youtube-player').classList.remove('hidden');
@@ -196,7 +177,6 @@
                         if (state.isPlaying) player.playVideo(); else player.pauseVideo();
                     }
                 } else {
-                    // Tocar Local/MP4
                     document.getElementById('youtube-player').classList.add('hidden');
                     if(isYTReady) player.stopVideo();
                     
@@ -223,22 +203,20 @@
                 
                 // Brilho (Implementado via CSS Filter)
                 if (controls.brightness !== undefined) {
-                    // O valor é 0-1, transforma para 0%-100% de brilho
-                    const brightnessValue = Math.max(0.2, controls.brightness); // Mínimo 20%
+                    const brightnessValue = Math.max(0.2, controls.brightness);
                     videoContainer.style.filter = `brightness(${brightnessValue * 100}%)`;
                 }
             });
             
-            // Se o vídeo local acabar, avisa o banco
             localPlayer.onended = () => db.child('status/ended').set(Date.now());
         }
 
-        // Adiciona funcionalidade de copiar a chave ao clicar
+        // Adiciona funcionalidade de copiar o nome ao clicar
         document.getElementById('connection-key').addEventListener('click', () => {
             navigator.clipboard.writeText(connectionKey).then(() => {
                 const info = document.getElementById('connection-info');
-                info.innerText = '✅ CHAVE COPIADA! Cole no controle.';
-                setTimeout(() => info.innerText = 'Cole esta chave no aplicativo Controle (Celular)', 3000);
+                info.innerText = '✅ NOME COPIADO! Cole no controle.';
+                setTimeout(() => info.innerText = 'Este é o nome fixo da sua TV. Clique para copiar.', 3000);
             });
         });
         
