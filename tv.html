@@ -8,14 +8,17 @@
     <style>
         body { margin: 0; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; }
         
+        /* O Player ocupa a tela toda */
         #video-container { 
             width: 100%; height: 100%; position: relative; 
             filter: brightness(100%); 
             transition: filter 0.5s; 
         }
-        #youtube-player, #local-video-player { width: 100%; height: 100%; position: absolute; top: 0; left: 0; border: none; }
+        /* Iframe simples para YouTube e links Web (maior compatibilidade) */
+        #media-player { width: 100%; height: 100%; position: absolute; top: 0; left: 0; border: none; }
         .hidden { display: none !important; }
 
+        /* Sobreposição de Conexão */
         #connection-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.95); z-index: 10000;
@@ -53,13 +56,12 @@
     </div>
 
     <div id="video-container">
-        <div id="youtube-player" class="hidden"></div>
+        <iframe id="media-player" class="hidden" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" frameborder="0"></iframe>
         <video id="local-video-player" class="hidden" controls={false}></video>
     </div>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <script src="https://www.youtube.com/iframe_api"></script>
 
     <script>
         // --- 1. COLE SUA CONFIGURAÇÃO DO FIREBASE AQUI ---
@@ -77,68 +79,63 @@
         firebase.initializeApp(firebaseConfig);
         let db;
 
-        // --- MUDANÇA: CHAVE FIXA E SIMPLIFICADA PARA ESTABILIDADE ---
         const connectionKey = "MYTV"; 
         
-        let player; 
         const localPlayer = document.getElementById('local-video-player');
+        const webPlayer = document.getElementById('media-player'); 
         const videoContainer = document.getElementById('video-container');
-        let isYTReady = false;
         let currentPlaylist = [];
         
         // Configurações de Conexão
         document.getElementById('connection-key').innerText = connectionKey;
         db = firebase.database().ref(`sessions/${connectionKey}`);
         
-        // Registra a TV como ativa com o nome fixo
         db.child('metadata').set({
-            name: connectionKey, // Agora o nome registrado é o caminho (MYTV)
+            name: connectionKey, 
             lastSeen: Date.now()
         });
+
+        // Tenta remover a sessão do Firebase quando a página for fechada
+        try {
+             db.onDisconnect().remove();
+        } catch(e) { /* Ignora se falhar */ }
+
+
+        // --- FUNÇÕES DE VÍDEO ---
         
-        // ... RESTANTE DO CÓDIGO (onYouTubeIframeAPIReady, getYouTubeId, setupListeners) ...
-        // Este bloco não foi alterado significativamente, mas precisa estar completo.
-
-        window.onYouTubeIframeAPIReady = function() {
-            player = new YT.Player('youtube-player', {
-                height: '100%', width: '100%', videoId: '',
-                playerVars: { 'controls': 0, 'rel': 0, 'playsinline': 1, 'autohide': 1, 'showinfo': 0, 'modestbranding': 1 },
-                events: {
-                    'onReady': () => { 
-                        isYTReady = true; 
-                        setupListeners();
-                    },
-                    'onStateChange': (e) => {
-                        if(e.data === YT.PlayerState.ENDED) db.child('status/ended').set(Date.now());
-                        if(e.data === YT.PlayerState.PLAYING) db.child('state/isPlaying').set(true);
-                        if(e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.BUFFERING) db.child('state/isPlaying').set(false);
-                    }
-                }
-            });
-        };
-
         const getYouTubeId = (url) => {
             if (!url) return null;
             const regExp = /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.*&v=|shorts\/|playlist\?list=|embed\/videoseries\?list=))([^&?#]+)/;
             const match = url.match(regExp);
             return (match && match[1].length === 11) ? match[1] : null;
         };
+
+        const generateEmbedUrl = (videoId, autoplay = true) => {
+             // Força autoplay e mostra controles
+             const params = `?autoplay=${autoplay ? 1 : 0}&controls=1&rel=0&playsinline=1&modestbranding=1`;
+             return `https://www.youtube.com/embed/${videoId}${params}`;
+        };
+        
+        // --- LÓGICA DE SINCRONIZAÇÃO E CONTROLES ---
         
         function setupListeners() {
             document.getElementById('connection-overlay').style.display = 'none';
 
+            // 1. Escutar Mudanças na Playlist
             db.child('playlist').on('value', (snapshot) => {
                 currentPlaylist = snapshot.val() || [];
             });
 
+            // 2. Escutar Comandos de Estado (Índice, Play/Pause)
             db.child('state').on('value', (snapshot) => {
                 const state = snapshot.val();
                 if(!state) return;
                 
+                // --- Ação de Sair do Vídeo / Limpar ---
                 if (state.clear) {
-                    if(isYTReady) player.stopVideo();
+                    webPlayer.src = ""; 
                     localPlayer.src = "";
-                    document.getElementById('youtube-player').classList.add('hidden');
+                    webPlayer.classList.add('hidden');
                     localPlayer.classList.add('hidden');
                     db.child('state/clear').remove();
                     return;
@@ -146,6 +143,7 @@
 
                 if (currentPlaylist.length === 0) return;
 
+                // Tenta entrar em fullscreen
                 try { 
                     if (document.fullscreenElement === null) document.body.requestFullscreen(); 
                 } catch(e){}
@@ -156,19 +154,24 @@
                 const ytId = getYouTubeId(videoData.url);
 
                 if (ytId) {
+                    // É YouTube: Usa o Iframe Player
                     localPlayer.classList.add('hidden');
                     localPlayer.pause();
-                    document.getElementById('youtube-player').classList.remove('hidden');
+                    webPlayer.classList.remove('hidden');
 
-                    if(isYTReady) {
-                        if(player.getVideoData().video_id !== ytId) {
-                            player.loadVideoById(ytId);
-                        }
-                        if (state.isPlaying) player.playVideo(); else player.pauseVideo();
+                    const embedUrl = generateEmbedUrl(ytId, state.isPlaying);
+                    
+                    if(webPlayer.src !== embedUrl) {
+                        webPlayer.src = embedUrl;
                     }
+                    
+                    // Se estiver pausado, carregamos o vídeo sem autoplay (autoplay=0)
+                    // e contamos com o controle manual dentro do iframe se o user interagir.
+
                 } else {
-                    document.getElementById('youtube-player').classList.add('hidden');
-                    if(isYTReady) player.stopVideo();
+                    // Não é YouTube: Assume que é MP4/Link Direto para o Player <video>
+                    webPlayer.classList.add('hidden');
+                    webPlayer.src = "";
                     
                     localPlayer.classList.remove('hidden');
                     
@@ -180,21 +183,24 @@
                 }
             });
 
+            // 3. Escutar Controles de Mídia (Volume, Brilho)
             db.child('mediaControls').on('value', (snapshot) => {
                 const controls = snapshot.val();
                 if(!controls) return;
                 
+                // Volume: Só afeta o player local <video>
                 if (controls.volume !== undefined) {
                     localPlayer.volume = controls.volume;
-                    if (isYTReady) player.setVolume(controls.volume * 100);
                 }
                 
+                // Brilho (Implementado via CSS Filter)
                 if (controls.brightness !== undefined) {
                     const brightnessValue = Math.max(0.2, controls.brightness);
                     videoContainer.style.filter = `brightness(${brightnessValue * 100}%)`;
                 }
             });
             
+            // Se o vídeo local acabar, avisa o banco
             localPlayer.onended = () => db.child('status/ended').set(Date.now());
         }
 
@@ -206,7 +212,7 @@
             });
         });
         
-        if (isYTReady) setupListeners();
+        setupListeners(); 
     </script>
 </body>
 </html>
