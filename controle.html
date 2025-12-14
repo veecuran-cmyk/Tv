@@ -138,15 +138,7 @@
     
     <script>
         // --- 1. COLE SUA CONFIGURAÇÃO DO FIREBASE AQUI ---
-        const firebaseConfig = {
-  apiKey: "AIzaSyBv62mYzTKqCTqo-Kfw5ds-GEk67L7_8-I",
-  authDomain: "sdfc-c1b59.firebaseapp.com",
-  projectId: "sdfc-c1b59",
-  storageBucket: "sdfc-c1b59.firebasestorage.app",
-  messagingSenderId: "799347293922",
-  appId: "1:799347293922:web:df6a9a6f76fcf2bbc9e8bb",
-  measurementId: "G-J91HPQWH8F"
-};
+        
         // --------------------------------------------------
 
         firebase.initializeApp(firebaseConfig);
@@ -160,7 +152,6 @@
         let currentKey = localStorage.getItem('remote_connection_key');
         
         document.addEventListener('DOMContentLoaded', () => {
-            // Preenche com a chave fixa se não houver chave salva, ou a chave salva
             keyInput.value = currentKey || "MYTV"; 
             if (currentKey) {
                 connectToTV(currentKey);
@@ -178,7 +169,6 @@
             
             dbRef = dbRoot.child(finalKey);
             
-            // --- CORREÇÃO: ADIÇÃO DE TRATAMENTO DE ERRO ROBUSTO ---
             dbRef.child('metadata/name').once('value', (snapshot) => {
                 if (!snapshot.exists()) {
                      status.innerText = `❌ TV com nome "${finalKey}" não registrada. Certifique-se que o Tablet está em "Configurar TV" E que o nome está correto.`;
@@ -186,7 +176,15 @@
                 }
                 
                 // Sucesso na Conexão
-                localStorage.setItem('remote_connection_key', finalKey); 
+   const firebaseConfig = {
+  apiKey: "AIzaSyBv62mYzTKqCTqo-Kfw5ds-GEk67L7_8-I",
+  authDomain: "sdfc-c1b59.firebaseapp.com",
+  projectId: "sdfc-c1b59",
+  storageBucket: "sdfc-c1b59.firebasestorage.app",
+  messagingSenderId: "799347293922",
+  appId: "1:799347293922:web:df6a9a6f76fcf2bbc9e8bb",
+  measurementId: "G-J91HPQWH8F"
+};             localStorage.setItem('remote_connection_key', finalKey); 
                 document.getElementById('connection-setup').classList.add('hidden');
                 document.getElementById('remote-control-area').classList.remove('hidden');
                 document.getElementById('connected-key').innerText = `Conectado à: ${snapshot.val()}`;
@@ -194,9 +192,8 @@
             }).catch(error => {
                  // Captura erros de configuração do Firebase ou rede
                  console.error("Erro Fatal no Firebase:", error);
-                 status.innerText = `❌ ERRO FATAL: Falha ao acessar o Firebase. Verifique suas credenciais na const firebaseConfig. Detalhe: ${error.message}`;
+                 status.innerText = `❌ ERRO FATAL: Falha ao acessar o Firebase. Verifique suas credenciais OU as regras do banco. Detalhe: ${error.message}`;
             });
-            // --------------------------------------------------------
         }
         
         function disconnect() {
@@ -205,7 +202,7 @@
             window.location.href = 'index.html';
         }
 
-        // --- LÓGICA DE PLAYLIST E VÍDEO (SEM ALTERAÇÃO) ---
+        // --- LÓGICA DE PLAYLIST E VÍDEO ---
         
         const isPlaylist = (url) => url.includes('list=');
 
@@ -377,4 +374,4 @@
         }
     </script>
 </body>
-    </html>
+</html>
