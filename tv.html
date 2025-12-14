@@ -14,7 +14,7 @@
             filter: brightness(100%); 
             transition: filter 0.5s; 
         }
-        /* Iframe simples para YouTube e links Web (maior compatibilidade) */
+        /* Iframe simples para YouTube e links Web */
         #media-player { width: 100%; height: 100%; position: absolute; top: 0; left: 0; border: none; }
         .hidden { display: none !important; }
 
@@ -66,14 +66,14 @@
     <script>
         // --- 1. COLE SUA CONFIGURAÇÃO DO FIREBASE AQUI ---
         const firebaseConfig = {
-  apiKey: "AIzaSyBv62mYzTKqCTqo-Kfw5ds-GEk67L7_8-I",
-  authDomain: "sdfc-c1b59.firebaseapp.com",
-  projectId: "sdfc-c1b59",
-  storageBucket: "sdfc-c1b59.firebasestorage.app",
-  messagingSenderId: "799347293922",
-  appId: "1:799347293922:web:df6a9a6f76fcf2bbc9e8bb",
-  measurementId: "G-J91HPQWH8F"
-};
+            apiKey: "SUA_API_KEY",
+            authDomain: "SEU_PROJETO.firebaseapp.com",
+            databaseURL: "https://SEU_PROJETO-default-rtdb.firebaseio.com",
+            projectId: "SEU_PROJETO",
+            storageBucket: "SEU_PROJETO.appspot.com",
+            messagingSenderId: "NUMERO",
+            appId: "ID"
+        };
         // --------------------------------------------------
 
         firebase.initializeApp(firebaseConfig);
@@ -90,6 +90,7 @@
         document.getElementById('connection-key').innerText = connectionKey;
         db = firebase.database().ref(`sessions/${connectionKey}`);
         
+        // Registra a sessão da TV
         db.child('metadata').set({
             name: connectionKey, 
             lastSeen: Date.now()
@@ -98,7 +99,7 @@
         // Tenta remover a sessão do Firebase quando a página for fechada
         try {
              db.onDisconnect().remove();
-        } catch(e) { /* Ignora se falhar */ }
+        } catch(e) { console.warn("onDisconnect failed, Firebase may not be configured properly or network issue."); }
 
 
         // --- FUNÇÕES DE VÍDEO ---
@@ -111,7 +112,6 @@
         };
 
         const generateEmbedUrl = (videoId, autoplay = true) => {
-             // Força autoplay e mostra controles
              const params = `?autoplay=${autoplay ? 1 : 0}&controls=1&rel=0&playsinline=1&modestbranding=1`;
              return `https://www.youtube.com/embed/${videoId}${params}`;
         };
@@ -159,14 +159,12 @@
                     localPlayer.pause();
                     webPlayer.classList.remove('hidden');
 
+                    // Passa o estado de play/pause no parâmetro 'autoplay' da URL
                     const embedUrl = generateEmbedUrl(ytId, state.isPlaying);
                     
                     if(webPlayer.src !== embedUrl) {
                         webPlayer.src = embedUrl;
                     }
-                    
-                    // Se estiver pausado, carregamos o vídeo sem autoplay (autoplay=0)
-                    // e contamos com o controle manual dentro do iframe se o user interagir.
 
                 } else {
                     // Não é YouTube: Assume que é MP4/Link Direto para o Player <video>
@@ -188,7 +186,7 @@
                 const controls = snapshot.val();
                 if(!controls) return;
                 
-                // Volume: Só afeta o player local <video>
+                // Volume: Apenas para o player local <video>
                 if (controls.volume !== undefined) {
                     localPlayer.volume = controls.volume;
                 }
