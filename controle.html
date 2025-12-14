@@ -72,11 +72,11 @@
 
     <div id="connection-setup" class="card">
         <h2>Conectar ao Stream TV</h2>
-        <p id="connection-status" style="color: #ffc107; margin-top: 10px;">Insira o nome da sua TV para conectar.</p>
+        <p id="connection-status" style="color: #ffc107; margin-top: 10px;">Insira o nome da sua TV para conectar. (TV deve estar aberta)</p>
         
         <div id="manual-key-entry">
-            <p style="color: #ccc; margin-top: 20px;">Nome da TV (Padrão: MY-TV-DEDICADA):</p>
-            <input type="text" id="keyInput" placeholder="Ex: MY-TV-DEDICADA" style="text-transform: uppercase;">
+            <p style="color: #ccc; margin-top: 20px;">Nome da TV (Fixo: MYTV):</p>
+            <input type="text" id="keyInput" placeholder="Ex: MYTV" style="text-transform: uppercase;">
             <button class="btn-action" onclick="connectToTV(document.getElementById('keyInput').value)">Conectar</button>
         </div>
     </div>
@@ -151,7 +151,7 @@
 
         firebase.initializeApp(firebaseConfig);
         const dbRoot = firebase.database().ref('sessions');
-        let dbRef; // Referência dinâmica à sessão da TV
+        let dbRef; 
         let keyInput = document.getElementById('keyInput');
 
         let playlist = [];
@@ -159,12 +159,10 @@
         let currentMediaControls = { volume: 0.5, brightness: 1.0 }; 
         let currentKey = localStorage.getItem('remote_connection_key');
         
-        // --- Funções de Conexão e Inicialização ---
-        
         document.addEventListener('DOMContentLoaded', () => {
-            keyInput.value = currentKey || "MY-TV-DEDICADA"; 
+            // Preenche com a chave fixa se não houver chave salva, ou a chave salva
+            keyInput.value = currentKey || "MYTV"; 
             if (currentKey) {
-                // Se houver uma chave salva (do nome fixo), tenta reconectar
                 connectToTV(currentKey);
             }
         });
@@ -173,17 +171,17 @@
             const finalKey = key.trim().toUpperCase();
             const status = document.getElementById('connection-status');
             
-            // Validação mínima para evitar conexões vazias
-            if (finalKey.length < 5) { 
-                status.innerText = '⚠️ O nome da TV deve ter pelo menos 5 caracteres.';
+            if (finalKey.length < 4) { 
+                status.innerText = '⚠️ O nome da TV deve ter pelo menos 4 caracteres.';
                 return;
             }
             
             dbRef = dbRoot.child(finalKey);
             
+            // --- CORREÇÃO: ADIÇÃO DE TRATAMENTO DE ERRO ROBUSTO ---
             dbRef.child('metadata/name').once('value', (snapshot) => {
                 if (!snapshot.exists()) {
-                     status.innerText = `❌ TV com nome ${finalKey} não registrada. Certifique-se que o Tablet está em "Configurar TV".`;
+                     status.innerText = `❌ TV com nome "${finalKey}" não registrada. Certifique-se que o Tablet está em "Configurar TV" E que o nome está correto.`;
                      return;
                 }
                 
@@ -193,7 +191,12 @@
                 document.getElementById('remote-control-area').classList.remove('hidden');
                 document.getElementById('connected-key').innerText = `Conectado à: ${snapshot.val()}`;
                 setupListeners();
+            }).catch(error => {
+                 // Captura erros de configuração do Firebase ou rede
+                 console.error("Erro Fatal no Firebase:", error);
+                 status.innerText = `❌ ERRO FATAL: Falha ao acessar o Firebase. Verifique suas credenciais na const firebaseConfig. Detalhe: ${error.message}`;
             });
+            // --------------------------------------------------------
         }
         
         function disconnect() {
@@ -202,7 +205,7 @@
             window.location.href = 'index.html';
         }
 
-        // --- LÓGICA DE PLAYLIST E VÍDEO (Sem Alterações) ---
+        // --- LÓGICA DE PLAYLIST E VÍDEO (SEM ALTERAÇÃO) ---
         
         const isPlaylist = (url) => url.includes('list=');
 
@@ -374,4 +377,4 @@
         }
     </script>
 </body>
-</html>
+    </html>
