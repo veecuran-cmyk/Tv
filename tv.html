@@ -9,7 +9,12 @@
         body { margin: 0; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; }
         
         /* O Player ocupa a tela toda */
-        #video-container { width: 100%; height: 100%; position: relative; }
+        #video-container { 
+            width: 100%; height: 100%; position: relative; 
+            /* Aplica o filtro de brilho controlado pelo JS/Firebase */
+            filter: brightness(100%); 
+            transition: filter 0.5s; 
+        }
         #youtube-player, #local-video-player { width: 100%; height: 100%; position: absolute; top: 0; left: 0; border: none; }
         .hidden { display: none !important; }
 
@@ -76,14 +81,15 @@
         firebase.initializeApp(firebaseConfig);
         let db;
 
-        // Variáveis
+        // Variáveis e Elementos
         let player; // YT Player object
-        let localPlayer = document.getElementById('local-video-player');
+        const localPlayer = document.getElementById('local-video-player');
+        const videoContainer = document.getElementById('video-container');
         let isYTReady = false;
         let currentPlaylist = [];
-        let connectionKey = localStorage.getItem('tv_connection_key');
+        let connectionKey = localStorage.getItem('tv_connection_key') || generateKey();
         
-        // --- LÓGICA DE GERAÇÃO E CONEXÃO DA CHAVE ---
+        // Funções de Inicialização
         
         function generateKey() {
             const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -94,41 +100,52 @@
             return result;
         }
 
-        if (!connectionKey) {
-            connectionKey = generateKey();
-            localStorage.setItem('tv_connection_key', connectionKey);
-        }
-
+        // Configurações de Conexão
+        localStorage.setItem('tv_connection_key', connectionKey);
         document.getElementById('connection-key').innerText = connectionKey;
         db = firebase.database().ref(`sessions/${connectionKey}`);
-        console.log(`Conectado ao Firebase com a chave: ${connectionKey}`);
         
+        // Registra a TV como ativa e o nome para o controle
+        db.child('metadata').set({
+            name: `Tablet TV (${connectionKey})`,
+            lastSeen: Date.now()
+        });
+
+        // Remove a sessão do Firebase quando a página é fechada (melhoria)
+        db.onDisconnect().remove();
+
         // --- FUNÇÕES YOUTUBE API ---
         
         window.onYouTubeIframeAPIReady = function() {
             player = new YT.Player('youtube-player', {
                 height: '100%', width: '100%', videoId: '',
-                playerVars: { 'controls': 0, 'rel': 0, 'playsinline': 1 },
+                playerVars: { 'controls': 0, 'rel': 0, 'playsinline': 1, 'autohide': 1, 'showinfo': 0, 'modestbranding': 1 },
                 events: {
                     'onReady': () => { 
                         isYTReady = true; 
                         setupListeners(); // Começa a escutar após o player estar pronto
                     },
                     'onStateChange': (e) => {
-                        // Se o vídeo acabar, avisa o controle (Firebase)
                         if(e.data === YT.PlayerState.ENDED) db.child('status/ended').set(Date.now());
+                        // Avisa o controle sobre o estado de pausa (para sincronizar o ícone)
+                        if(e.data === YT.PlayerState.PLAYING) db.child('state/isPlaying').set(true);
+                        if(e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.BUFFERING) db.child('state/isPlaying').set(false);
                     }
                 }
             });
         };
 
-        // Helpers
+        // Tolerância melhorada para YouTube
         const getYouTubeId = (url) => {
-            const match = url.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/);
-            return (match && match[2].length === 11) ? match[2] : null;
+            if (!url) return null;
+            // Padrão que captura ID de watch, v, youtu.be, shorts e até de playlists (apenas o primeiro vídeo)
+            const regExp = /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.*&v=|shorts\/|playlist\?list=|embed\/videoseries\?list=))([^&?#]+)/;
+            const match = url.match(regExp);
+            // Verifica se é um ID de vídeo válido (11 caracteres)
+            return (match && match[1].length === 11) ? match[1] : null;
         };
         
-        // --- LÓGICA DE SINCRONIZAÇÃO ---
+        // --- LÓGICA DE SINCRONIZAÇÃO E CONTROLES ---
         
         function setupListeners() {
             // Esconde a sobreposição ao conectar
@@ -142,11 +159,23 @@
             // 2. Escutar Comandos de Estado (Índice, Play/Pause)
             db.child('state').on('value', (snapshot) => {
                 const state = snapshot.val();
-                if(!state || currentPlaylist.length === 0) return;
+                if(!state) return;
+                
+                // --- Ação de Sair do Vídeo / Limpar ---
+                if (state.clear) {
+                    player.stopVideo();
+                    localPlayer.src = "";
+                    document.getElementById('youtube-player').classList.add('hidden');
+                    localPlayer.classList.add('hidden');
+                    db.child('state/clear').remove();
+                    return;
+                }
+
+                if (currentPlaylist.length === 0) return;
 
                 // Tenta entrar em fullscreen e desbloquear áudio (requer interação)
                 try { 
-                    document.body.requestFullscreen(); 
+                    if (document.fullscreenElement === null) document.body.requestFullscreen(); 
                 } catch(e){}
 
                 const videoData = currentPlaylist[state.index];
@@ -161,12 +190,10 @@
                     document.getElementById('youtube-player').classList.remove('hidden');
 
                     if(isYTReady) {
-                        // Só carrega se o ID mudou
                         if(player.getVideoData().video_id !== ytId) {
                             player.loadVideoById(ytId);
                         }
-                        // Estado Play/Pause
-                        state.isPlaying ? player.playVideo() : player.pauseVideo();
+                        if (state.isPlaying) player.playVideo(); else player.pauseVideo();
                     }
                 } else {
                     // Tocar Local/MP4
@@ -175,12 +202,30 @@
                     
                     localPlayer.classList.remove('hidden');
                     
-                    // Só recarrega se a URL mudou
                     if(localPlayer.src !== videoData.url) {
                         localPlayer.src = videoData.url;
                     }
                     
-                    state.isPlaying ? localPlayer.play() : localPlayer.pause();
+                    if (state.isPlaying) localPlayer.play().catch(e => console.log("Autoplay falhou no Local")); else localPlayer.pause();
+                }
+            });
+
+            // 3. Escutar Controles de Mídia (Volume, Brilho)
+            db.child('mediaControls').on('value', (snapshot) => {
+                const controls = snapshot.val();
+                if(!controls) return;
+                
+                // Volume
+                if (controls.volume !== undefined) {
+                    localPlayer.volume = controls.volume;
+                    if (isYTReady) player.setVolume(controls.volume * 100);
+                }
+                
+                // Brilho (Implementado via CSS Filter)
+                if (controls.brightness !== undefined) {
+                    // O valor é 0-1, transforma para 0%-100% de brilho
+                    const brightnessValue = Math.max(0.2, controls.brightness); // Mínimo 20%
+                    videoContainer.style.filter = `brightness(${brightnessValue * 100}%)`;
                 }
             });
             
@@ -197,7 +242,6 @@
             });
         });
         
-        // Tenta iniciar a escuta, caso o YT já esteja pronto
         if (isYTReady) setupListeners();
     </script>
 </body>
