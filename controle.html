@@ -138,13 +138,22 @@
     
     <script>
         // --- 1. COLE SUA CONFIGURAÇÃO DO FIREBASE AQUI ---
-        
+        const firebaseConfig = {
+  apiKey: "AIzaSyBv62mYzTKqCTqo-Kfw5ds-GEk67L7_8-I",
+  authDomain: "sdfc-c1b59.firebaseapp.com",
+  projectId: "sdfc-c1b59",
+  storageBucket: "sdfc-c1b59.firebasestorage.app",
+  messagingSenderId: "799347293922",
+  appId: "1:799347293922:web:df6a9a6f76fcf2bbc9e8bb",
+  measurementId: "G-J91HPQWH8F"
+};
         // --------------------------------------------------
 
         firebase.initializeApp(firebaseConfig);
         const dbRoot = firebase.database().ref('sessions');
         let dbRef; 
         let keyInput = document.getElementById('keyInput');
+        const statusElement = document.getElementById('connection-status'); // Referência direta ao status
 
         let playlist = [];
         let currentState = { index: 0, isPlaying: false };
@@ -160,39 +169,34 @@
 
         function connectToTV(key) {
             const finalKey = key.trim().toUpperCase();
-            const status = document.getElementById('connection-status');
             
             if (finalKey.length < 4) { 
-                status.innerText = '⚠️ O nome da TV deve ter pelo menos 4 caracteres.';
+                statusElement.innerText = '⚠️ O nome da TV deve ter pelo menos 4 caracteres.';
                 return;
             }
             
             dbRef = dbRoot.child(finalKey);
+            statusElement.style.color = '#ffc107';
+            statusElement.innerText = `Tentando conectar a ${finalKey}...`;
             
             dbRef.child('metadata/name').once('value', (snapshot) => {
                 if (!snapshot.exists()) {
-                     status.innerText = `❌ TV com nome "${finalKey}" não registrada. Certifique-se que o Tablet está em "Configurar TV" E que o nome está correto.`;
+                     statusElement.style.color = '#dc3545';
+                     statusElement.innerText = `❌ TV "${finalKey}" não registrada. 1. Verifique o nome. 2. A TV (tablet) deve estar aberta em "Configurar TV".`;
                      return;
                 }
                 
                 // Sucesso na Conexão
-   const firebaseConfig = {
-  apiKey: "AIzaSyBv62mYzTKqCTqo-Kfw5ds-GEk67L7_8-I",
-  authDomain: "sdfc-c1b59.firebaseapp.com",
-  projectId: "sdfc-c1b59",
-  storageBucket: "sdfc-c1b59.firebasestorage.app",
-  messagingSenderId: "799347293922",
-  appId: "1:799347293922:web:df6a9a6f76fcf2bbc9e8bb",
-  measurementId: "G-J91HPQWH8F"
-};             localStorage.setItem('remote_connection_key', finalKey); 
+                localStorage.setItem('remote_connection_key', finalKey); 
                 document.getElementById('connection-setup').classList.add('hidden');
                 document.getElementById('remote-control-area').classList.remove('hidden');
                 document.getElementById('connected-key').innerText = `Conectado à: ${snapshot.val()}`;
                 setupListeners();
             }).catch(error => {
-                 // Captura erros de configuração do Firebase ou rede
+                 // Captura erros de configuração do Firebase ou rede/permissão
                  console.error("Erro Fatal no Firebase:", error);
-                 status.innerText = `❌ ERRO FATAL: Falha ao acessar o Firebase. Verifique suas credenciais OU as regras do banco. Detalhe: ${error.message}`;
+                 statusElement.style.color = '#dc3545';
+                 statusElement.innerText = `❌ ERRO FATAL: Falha ao acessar o Firebase. Verifique suas credenciais OU as regras (must be ".read": true, ".write": true). Detalhe: ${error.message}`;
             });
         }
         
@@ -374,4 +378,4 @@
         }
     </script>
 </body>
-</html>
+        </html>
