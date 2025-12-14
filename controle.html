@@ -44,17 +44,6 @@
         }
         .btn-action:hover { background: #218838; }
 
-        /* Sliders */
-        input[type="range"] { 
-            width: 80%; margin: 10px 0;
-            -webkit-appearance: none; appearance: none;
-            background: #333; height: 8px; border-radius: 5px;
-        }
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none; appearance: none;
-            width: 20px; height: 20px; background: #007bff; border-radius: 50%; cursor: pointer;
-        }
-
         /* Playlist */
         #playlist { list-style: none; padding: 0; text-align: left; }
         #playlist li {
@@ -67,7 +56,7 @@
         .del-btn { background: none; border: none; color: #ff4444; cursor: pointer; font-size: 1.2em; }
         .hidden { display: none !important; }
         
-        /* Modal (Pop-up de Playlist e Seleção de TV) */
+        /* Modal (Pop-up de Playlist) */
         .modal {
             position: fixed; z-index: 10001; left: 0; top: 0; width: 100%; height: 100%;
             background-color: rgba(0, 0, 0, 0.8); display: none; justify-content: center; align-items: center;
@@ -77,29 +66,18 @@
             text-align: left; position: relative;
         }
         .modal-content button { margin-top: 10px; }
-        
-        /* Lista de TVs */
-        #tv-list button {
-            width: 100%; text-align: left; padding: 10px; margin-bottom: 8px;
-            background: #333; color: white; border: none; border-radius: 5px; cursor: pointer;
-        }
     </style>
 </head>
 <body>
 
     <div id="connection-setup" class="card">
         <h2>Conectar ao Stream TV</h2>
-        <p id="connection-status" style="color: #ffc107; margin-top: 10px;">Buscando TVs ativas...</p>
+        <p id="connection-status" style="color: #ffc107; margin-top: 10px;">Insira o nome da sua TV para conectar.</p>
         
         <div id="manual-key-entry">
-            <p style="color: #ccc; margin-top: 20px;">Ou insira a chave manualmente:</p>
-            <input type="text" id="keyInput" placeholder="Ex: A1B2C3" maxlength="6" style="text-transform: uppercase;">
-            <button class="btn-action" onclick="connectToTV(document.getElementById('keyInput').value)">Conectar Manualmente</button>
-        </div>
-        
-        <div id="tv-selection-area" class="hidden">
-            <p style="color: #ccc; margin-top: 20px;">Múltiplas TVs encontradas. Selecione:</p>
-            <div id="tv-list"></div>
+            <p style="color: #ccc; margin-top: 20px;">Nome da TV (Padrão: MY-TV-DEDICADA):</p>
+            <input type="text" id="keyInput" placeholder="Ex: MY-TV-DEDICADA" style="text-transform: uppercase;">
+            <button class="btn-action" onclick="connectToTV(document.getElementById('keyInput').value)">Conectar</button>
         </div>
     </div>
 
@@ -158,26 +136,17 @@
         </div>
     </div>
     
-    <div id="tv-select-modal" class="modal">
-        <div class="modal-content">
-            <h3>Múltiplas TVs Ativas!</h3>
-            <p>Selecione o dispositivo que você deseja controlar:</p>
-            <div id="modal-tv-list"></div>
-        </div>
-    </div>
-
-
     <script>
         // --- 1. COLE SUA CONFIGURAÇÃO DO FIREBASE AQUI ---
         const firebaseConfig = {
-            apiKey: "SUA_API_KEY",
-            authDomain: "SEU_PROJETO.firebaseapp.com",
-            databaseURL: "https://SEU_PROJETO-default-rtdb.firebaseio.com",
-            projectId: "SEU_PROJETO",
-            storageBucket: "SEU_PROJETO.appspot.com",
-            messagingSenderId: "NUMERO",
-            appId: "ID"
-        };
+  apiKey: "AIzaSyBv62mYzTKqCTqo-Kfw5ds-GEk67L7_8-I",
+  authDomain: "sdfc-c1b59.firebaseapp.com",
+  projectId: "sdfc-c1b59",
+  storageBucket: "sdfc-c1b59.firebasestorage.app",
+  messagingSenderId: "799347293922",
+  appId: "1:799347293922:web:df6a9a6f76fcf2bbc9e8bb",
+  measurementId: "G-J91HPQWH8F"
+};
         // --------------------------------------------------
 
         firebase.initializeApp(firebaseConfig);
@@ -187,83 +156,39 @@
 
         let playlist = [];
         let currentState = { index: 0, isPlaying: false };
-        let currentMediaControls = { volume: 0.5, brightness: 1.0 }; // Padrão
+        let currentMediaControls = { volume: 0.5, brightness: 1.0 }; 
         let currentKey = localStorage.getItem('remote_connection_key');
         
         // --- Funções de Conexão e Inicialização ---
         
         document.addEventListener('DOMContentLoaded', () => {
-            // Se tiver uma chave salva, tenta conectar diretamente
+            keyInput.value = currentKey || "MY-TV-DEDICADA"; 
             if (currentKey) {
+                // Se houver uma chave salva (do nome fixo), tenta reconectar
                 connectToTV(currentKey);
-            } else {
-                // Se não, busca TVs ativas
-                searchActiveTVs();
             }
         });
 
-        function searchActiveTVs() {
-            document.getElementById('connection-status').innerText = 'Buscando TVs ativas...';
-            dbRoot.once('value', (snapshot) => {
-                const sessions = snapshot.val();
-                if (!sessions) {
-                    document.getElementById('connection-status').innerText = 'Nenhuma TV ativa encontrada. Use a chave manual abaixo.';
-                    return;
-                }
-                
-                const activeTVs = [];
-                for (const key in sessions) {
-                    // Simples filtro de TVs que não foram "removidas" pelo onDisconnect
-                    if (sessions[key].metadata && sessions[key].metadata.name) {
-                        activeTVs.push({ key: key, name: sessions[key].metadata.name });
-                    }
-                }
-                
-                if (activeTVs.length === 0) {
-                    document.getElementById('connection-status').innerText = 'Nenhuma TV ativa encontrada. Use a chave manual abaixo.';
-                } else if (activeTVs.length === 1) {
-                    // Conexão Automática!
-                    document.getElementById('connection-status').innerText = `TV única encontrada: ${activeTVs[0].name}. Conectando...`;
-                    connectToTV(activeTVs[0].key);
-                } else {
-                    // Múltiplas TVs
-                    showTVSelection(activeTVs);
-                }
-            });
-        }
-        
-        function showTVSelection(tvs) {
-            const listContainer = document.getElementById('modal-tv-list');
-            listContainer.innerHTML = '';
-            tvs.forEach(tv => {
-                const btn = document.createElement('button');
-                btn.innerText = tv.name;
-                btn.onclick = () => {
-                    document.getElementById('tv-select-modal').style.display = 'none';
-                    connectToTV(tv.key);
-                };
-                listContainer.appendChild(btn);
-            });
-            document.getElementById('tv-select-modal').style.display = 'flex';
-        }
-
         function connectToTV(key) {
             const finalKey = key.trim().toUpperCase();
-            if (finalKey.length !== 6) {
-                document.getElementById('connection-status').innerText = '⚠️ A chave deve ter 6 caracteres.';
+            const status = document.getElementById('connection-status');
+            
+            // Validação mínima para evitar conexões vazias
+            if (finalKey.length < 5) { 
+                status.innerText = '⚠️ O nome da TV deve ter pelo menos 5 caracteres.';
                 return;
             }
             
             dbRef = dbRoot.child(finalKey);
             
-            // Verifica se a chave existe (pelo menos a pasta metadata)
             dbRef.child('metadata/name').once('value', (snapshot) => {
                 if (!snapshot.exists()) {
-                     document.getElementById('connection-status').innerText = `❌ TV com chave ${finalKey} não está ativa. Tente novamente.`;
+                     status.innerText = `❌ TV com nome ${finalKey} não registrada. Certifique-se que o Tablet está em "Configurar TV".`;
                      return;
                 }
                 
-                localStorage.setItem('remote_connection_key', finalKey);
+                // Sucesso na Conexão
+                localStorage.setItem('remote_connection_key', finalKey); 
                 document.getElementById('connection-setup').classList.add('hidden');
                 document.getElementById('remote-control-area').classList.remove('hidden');
                 document.getElementById('connected-key').innerText = `Conectado à: ${snapshot.val()}`;
@@ -273,19 +198,16 @@
         
         function disconnect() {
             localStorage.removeItem('remote_connection_key');
-            // Remove os listeners antigos antes de recarregar
             if (dbRef) dbRef.off(); 
             window.location.href = 'index.html';
         }
 
-        // --- LÓGICA DE PLAYLIST E VÍDEO ---
+        // --- LÓGICA DE PLAYLIST E VÍDEO (Sem Alterações) ---
         
-        // Tolerância melhorada para YouTube, verificando playlists
         const isPlaylist = (url) => url.includes('list=');
 
         const getYouTubeId = (url) => {
             if (!url) return null;
-            // Captura ID de watch, v, youtu.be, shorts (o mesmo do tv.html)
             const regExp = /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.*&v=|shorts\/|playlist\?list=|embed\/videoseries\?list=))([^&?#]+)/;
             const match = url.match(regExp);
             return (match && match[1].length === 11) ? match[1] : null;
@@ -296,10 +218,8 @@
             if (!url) return alert("Insira um link!");
 
             if (isPlaylist(url)) {
-                // Abre o pop-up de playlist
                 document.getElementById('playlist-modal').style.display = 'flex';
             } else {
-                // Adiciona vídeo normal
                 const title = document.getElementById('titleInput').value.trim() || `Vídeo ${playlist.length + 1}`;
                 addVideoToPlaylist(url, title);
             }
@@ -360,7 +280,6 @@
             if(currentState.index < playlist.length - 1) {
                 dbRef.child('state').set({ index: currentState.index + 1, isPlaying: true });
             } else {
-                // Reinicia a playlist
                 dbRef.child('state').set({ index: 0, isPlaying: false });
             }
         }
@@ -377,34 +296,28 @@
             dbRef.child('mediaControls/brightness').set(currentMediaControls.brightness);
         }
 
-        // --- OUVINTES DO FIREBASE ---
+        // --- OUVINTES DO FIREBASE E RENDERIZAÇÃO ---
         
         function setupListeners() {
-            // Atualiza a Playlist na tela do celular
             dbRef.child('playlist').on('value', (snapshot) => {
                 playlist = snapshot.val() || [];
                 renderPlaylist();
             });
 
-            // Atualiza os botões (estado de Play/Pause e índice)
             dbRef.child('state').on('value', (snapshot) => {
                 currentState = snapshot.val() || { index: 0, isPlaying: false };
                 updateUI();
             });
 
-            // Escuta se o vídeo acabou na TV para pular automaticamente
             dbRef.child('status/ended').on('value', (snapshot) => {
                 if(snapshot.val() && currentState.isPlaying) nextVideo();
             });
 
-            // Sincroniza o estado de volume/brilho no controle
             dbRef.child('mediaControls').on('value', (snapshot) => {
                  currentMediaControls = snapshot.val() || { volume: 0.5, brightness: 1.0 };
             });
         }
         
-        // --- RENDERIZAÇÃO ---
-
         function updateUI() {
             const icon = document.getElementById('play-icon');
             if(currentState.isPlaying) {
@@ -444,10 +357,9 @@
         window.playSpecific = (index) => dbRef.child('state').set({ index: index, isPlaying: true });
         
         window.deleteVideo = (index) => {
-            // Implementação da exclusão... (Mantida a mesma lógica anterior, apenas envolta em 'window')
              if(confirm('Remover vídeo?')) {
                 const newPlaylist = playlist.filter((_, i) => i !== index);
-      dbRef.child('playlist').set(newPlaylist);
+                dbRef.child('playlist').set(newPlaylist);
                 
                 let newIndex = currentState.index;
                 if (index < currentState.index) {
