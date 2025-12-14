@@ -8,7 +8,6 @@
     <style>
         body { margin: 0; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; }
         
-        /* O Player ocupa a tela toda */
         #video-container { 
             width: 100%; height: 100%; position: relative; 
             filter: brightness(100%); 
@@ -17,7 +16,6 @@
         #youtube-player, #local-video-player { width: 100%; height: 100%; position: absolute; top: 0; left: 0; border: none; }
         .hidden { display: none !important; }
 
-        /* Sobreposição de Chave */
         #connection-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.95); z-index: 10000;
@@ -32,7 +30,6 @@
         }
         #connection-info { margin-top: 20px; color: #ccc; }
         
-        /* Botão de Menu para sair do modo TV */
         #back-btn {
             position: fixed; top: 10px; left: 10px; 
             background: rgba(255,255,255,0.2); color: white; 
@@ -51,7 +48,7 @@
     <div id="connection-overlay">
         <h1>Stream TV Mode 📺</h1>
         <p>A TV está no ar. Use o nome abaixo no controle:</p>
-        <span id="connection-key" title="Clique para Copiar">MY-TV-DEDICADA</span>
+        <span id="connection-key" title="Clique para Copiar">MYTV</span>
         <p id="connection-info">Este é o nome fixo da sua TV. Clique para copiar.</p>
     </div>
 
@@ -80,10 +77,9 @@
         firebase.initializeApp(firebaseConfig);
         let db;
 
-        // --- MUDANÇA: CHAVE FIXA PARA ESTABILIDADE ---
-        const connectionKey = "MY-TV-DEDICADA"; 
+        // --- MUDANÇA: CHAVE FIXA E SIMPLIFICADA PARA ESTABILIDADE ---
+        const connectionKey = "MYTV"; 
         
-        // Variáveis e Elementos
         let player; 
         const localPlayer = document.getElementById('local-video-player');
         const videoContainer = document.getElementById('video-container');
@@ -94,14 +90,15 @@
         document.getElementById('connection-key').innerText = connectionKey;
         db = firebase.database().ref(`sessions/${connectionKey}`);
         
-        // Registra a TV como ativa com um nome amigável
+        // Registra a TV como ativa com o nome fixo
         db.child('metadata').set({
-            name: `Stream TV Dedicada`,
+            name: connectionKey, // Agora o nome registrado é o caminho (MYTV)
             lastSeen: Date.now()
         });
-
-        // --- FUNÇÕES YOUTUBE API ---
         
+        // ... RESTANTE DO CÓDIGO (onYouTubeIframeAPIReady, getYouTubeId, setupListeners) ...
+        // Este bloco não foi alterado significativamente, mas precisa estar completo.
+
         window.onYouTubeIframeAPIReady = function() {
             player = new YT.Player('youtube-player', {
                 height: '100%', width: '100%', videoId: '',
@@ -127,23 +124,17 @@
             return (match && match[1].length === 11) ? match[1] : null;
         };
         
-        // --- LÓGICA DE SINCRONIZAÇÃO E CONTROLES ---
-        
         function setupListeners() {
-            // Esconde a sobreposição ao conectar
             document.getElementById('connection-overlay').style.display = 'none';
 
-            // 1. Escutar Mudanças na Playlist
             db.child('playlist').on('value', (snapshot) => {
                 currentPlaylist = snapshot.val() || [];
             });
 
-            // 2. Escutar Comandos de Estado (Índice, Play/Pause)
             db.child('state').on('value', (snapshot) => {
                 const state = snapshot.val();
                 if(!state) return;
                 
-                // --- Ação de Sair do Vídeo / Limpar ---
                 if (state.clear) {
                     if(isYTReady) player.stopVideo();
                     localPlayer.src = "";
@@ -155,7 +146,6 @@
 
                 if (currentPlaylist.length === 0) return;
 
-                // Tenta entrar em fullscreen
                 try { 
                     if (document.fullscreenElement === null) document.body.requestFullscreen(); 
                 } catch(e){}
@@ -190,18 +180,15 @@
                 }
             });
 
-            // 3. Escutar Controles de Mídia (Volume, Brilho)
             db.child('mediaControls').on('value', (snapshot) => {
                 const controls = snapshot.val();
                 if(!controls) return;
                 
-                // Volume
                 if (controls.volume !== undefined) {
                     localPlayer.volume = controls.volume;
                     if (isYTReady) player.setVolume(controls.volume * 100);
                 }
                 
-                // Brilho (Implementado via CSS Filter)
                 if (controls.brightness !== undefined) {
                     const brightnessValue = Math.max(0.2, controls.brightness);
                     videoContainer.style.filter = `brightness(${brightnessValue * 100}%)`;
@@ -211,7 +198,6 @@
             localPlayer.onended = () => db.child('status/ended').set(Date.now());
         }
 
-        // Adiciona funcionalidade de copiar o nome ao clicar
         document.getElementById('connection-key').addEventListener('click', () => {
             navigator.clipboard.writeText(connectionKey).then(() => {
                 const info = document.getElementById('connection-info');
