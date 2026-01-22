@@ -2,115 +2,274 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stream Flex - Menu de Conexão</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    
+    <title>MIRACULOUS TERMINAL: ULTIMATE MOBA</title>
+    <style>
+        body { background: #050505; color: #00ff41; font-family: 'Courier New', monospace; margin: 0; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
+        #ui-header { background: #001a00; border-bottom: 3px solid #00ff41; padding: 15px; height: 200px; font-size: 13px; overflow: hidden; flex-shrink: 0; }
+        #game-output { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; }
+        #input-area { background: #000; border-top: 2px solid #00ff41; padding: 15px; display: flex; }
+        input { background: transparent; border: none; color: #fff; font-family: inherit; font-size: 18px; width: 100%; outline: none; }
+        .log { margin-bottom: 5px; animation: fadeIn 0.3s; }
+        .log-ult { color: #ff00ff; font-weight: bold; text-transform: uppercase; }
+        .log-dmg { color: #ff4444; }
+        .log-sys { color: #ffff00; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-
-    <style>
-        body {
-            font-family: 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-            height: 100vh;
-            margin: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            text-align: center;
-        }
-        .container {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            padding: 40px;
-            border-radius: 20px;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-            max-width: 400px;
-            width: 90%;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        h1 { margin-bottom: 30px; }
-        
-        .btn-mode {
-            display: block;
-            width: 100%;
-            padding: 15px;
-            margin: 15px 0;
-            border: none;
-            border-radius: 10px;
-            font-size: 18px;
-            cursor: pointer;
-            transition: transform 0.2s, background 0.2s;
-            text-decoration: none;
-            color: white;
-            font-weight: bold;
-            box-sizing: border-box;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-
-        .btn-tv { background: linear-gradient(to right, #ff4b1f, #ff9068); }
-        .btn-remote { background: linear-gradient(to right, #00b09b, #007bff); }
-        
-        .btn-mode:hover { transform: scale(1.03); filter: brightness(1.1); }
-        
-        .info-area {
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid rgba(255,255,255,0.2);
-            font-size: 0.9em;
-            color: #ccc;
-        }
-        .info-area strong { color: white; }
-    </style>
 </head>
 <body>
 
-    <div class="container">
-        <h1>Stream Flex</h1>
-        
-        <a href="tv.html" class="btn-mode btn-tv">
-            <i class="fas fa-tv"></i> Configurar TV (Tablet)
-        </a>
-        
-        <a href="controle.html" class="btn-mode btn-remote">
-            <i class="fas fa-mobile-alt"></i> Abrir Controle (Celular)
-        </a>
+<div id="ui-header">CARREGANDO SISTEMA... AGUARDANDO COMANDO /create OU /connect</div>
+<div id="game-output"></div>
+<div id="input-area"><span>> </span><input type="text" id="cmd-input" autofocus autocomplete="off"></div>
 
-        <div class="info-area">
-            <p><strong>INSTRUÇÕES (Modo Manual):</strong></p>
-            <ol style="padding-left: 20px; text-align: left;">
-                <li>No seu Tablet (TV), clique em **"Configurar TV"**.</li>
-                <li>O nome da sua TV será fixo: **MY-TV-DEDICADA**.</li>
-                <li>No seu Celular (Controle), clique em **"Abrir Controle"** e insira o nome fixo para conectar.</li>
-            </ol>
-            <p>Este método é mais estável em dispositivos antigos.</p>
-        </div>
-    </div>
+<script>
+// --- CONFIG FIREBASE (SALA PÚBLICA PARA TESTE) ---
+const firebaseConfig = { databaseURL: "https://servidor-e2453-default-rtdb.firebaseio.com" };
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
-    <script>
-        // --- 1. COLE SUA CONFIGURAÇÃO DO FIREBASE AQUI ---
-        const firebaseConfig = {
-  apiKey: "AIzaSyBv62mYzTKqCTqo-Kfw5ds-GEk67L7_8-I",
-  authDomain: "sdfc-c1b59.firebaseapp.com",
-  projectId: "sdfc-c1b59",
-  storageBucket: "sdfc-c1b59.firebasestorage.app",
-  messagingSenderId: "799347293922",
-  appId: "1:799347293922:web:df6a9a6f76fcf2bbc9e8bb",
-  measurementId: "G-J91HPQWH8F"
+// --- DATABASE DE HERÓIS (OS 19) ---
+const HEROES = {
+    cat: { n: "Gato Preto", class: "Assassino", hp: 900, atk: 100, ult: "Cataclismo" },
+    ladybug: { n: "Joaninha", class: "Versátil", hp: 1000, atk: 80, ult: "Talismã" },
+    fox: { n: "Raposa", class: "Suporte", hp: 850, atk: 70, ult: "Miragem" },
+    bee: { n: "Abelha", class: "Controle", hp: 900, atk: 75, ult: "Ferroada" },
+    turtle: { n: "Tartaruga", class: "Tanque", hp: 1500, atk: 60, ult: "Casco" },
+    peacock: { n: "Pavão", class: "Mago", hp: 900, atk: 85, ult: "Amokyzação" },
+    butterfly: { n: "Borboleta", class: "Suporte", hp: 950, atk: 65, ult: "Akumatização" },
+    horse: { n: "Cavalo", class: "Versátil", hp: 900, atk: 80, ult: "Viagem" },
+    mouse: { n: "Rato", class: "Atacante", hp: 800, atk: 90, ult: "Multiplicar" },
+    ox: { n: "Touro", class: "Tanque", hp: 1600, atk: 70, ult: "Resistência" },
+    tiger: { n: "Tigre", class: "Atacante", hp: 1100, atk: 95, ult: "Colisão" },
+    rabbit: { n: "Coelho", class: "Mago", hp: 850, atk: 75, ult: "Toca" },
+    snake: { n: "Cobra", class: "Estratégico", hp: 1000, atk: 70, ult: "Segunda Chance" },
+    goat: { n: "Cabra", class: "Suporte", hp: 900, atk: 60, ult: "Gênesis" },
+    monkey: { n: "Macaco", class: "Lutador", hp: 1050, atk: 85, ult: "Alvoroço" },
+    rooster: { n: "Galo", class: "Versátil", hp: 900, atk: 80, ult: "Sublimação" },
+    dog: { n: "Cachorro", class: "Jangle", hp: 1000, atk: 85, ult: "Pega" },
+    pig: { n: "Porco", class: "Controle", hp: 1000, atk: 70, ult: "Presente" },
+    dragon: { n: "Dragão", class: "Mago", hp: 1100, atk: 90, ult: "Elementos" }
 };
-        // --------------------------------------------------
 
-        try {
-            firebase.initializeApp(firebaseConfig);
-        } catch (error) {
-            console.error("Erro ao inicializar Firebase: ", error);
-            document.querySelector('.info-area').innerHTML = '<p style="color: #ffcccc;">⚠️ Erro de Configuração: Por favor, cole suas credenciais do Firebase nos arquivos.</p>';
+// --- ESTADO DO JOGADOR ---
+let myID = "P" + Math.floor(Math.random()*999);
+let roomID = null;
+let player = {
+    id: myID, hero: null, team: "blue", loc: "BASE",
+    hp: 100, maxHp: 100, lvl: 1, xp: 0, gold: 500, mana: 100,
+    items: [], marks: 0, status: "Normal", cd: { r:0, f:0 }
+};
+
+// --- MAPA ---
+const LOCS = ["BASE", "T1_MID", "T2_MID", "T3_MID", "T1_SOLO", "T2_SOLO", "T3_SOLO", "T1_DUO", "T2_DUO", "T3_DUO", "JUNGLE", "MATAGAL1", "MATAGAL2", "NUCLEO"];
+
+// --- INPUT HANDLER ---
+document.getElementById('cmd-input').addEventListener('keydown', e => {
+    if(e.key === 'Enter'){
+        let val = e.target.value.trim();
+        e.target.value = '';
+        if(val) exec(val);
+    }
+});
+
+function exec(cmdStr) {
+    let args = cmdStr.split(' ');
+    let cmd = args[0].toLowerCase();
+
+    if(cmd === '/create') { roomID = args[1]; player.team = "blue"; start(); return; }
+    if(cmd === '/connect') { roomID = args[1]; player.team = "red"; start(); return; }
+    if(cmd === '/pick') { setHero(args[1]); return; }
+    
+    if(!roomID || !player.hero) return log("Conecte e escolha um herói primeiro!", "log-dmg");
+
+    switch(cmd) {
+        case '/move': move(args[1]); break;
+        case '/a': attack(); break;
+        case '/r': ult(); break;
+        case '/tp': tp(); break;
+        case '/chat': chat(args.slice(1).join(' ')); break;
+        case '/all': chat(args.slice(1).join(' '), true); break;
+        case 'f': flash(); break;
+        case '$': shop(args); break;
+        case '/status': log(`Status: ${JSON.stringify(player)}`, "log-sys"); break;
+        case 'help': showHelp(); break;
+        default: log("Comando desconhecido.", "log-dmg");
+    }
+}
+
+// --- LOGICA DE JOGO ---
+function start() {
+    log(`Sala ${roomID} iniciada. Time ${player.team}`, "log-sys");
+    db.ref(`rooms/${roomID}/players/${myID}`).set(player);
+    
+    db.ref(`rooms/${roomID}`).on('value', snap => {
+        let data = snap.val();
+        if(data) {
+            handleEvents(data.events);
+            renderHUD(data.players);
         }
-    </script>
+    });
+
+    setInterval(tick, 1000);
+}
+
+function setHero(hKey) {
+    if(HEROES[hKey]) {
+        player.hero = hKey;
+        player.maxHp = HEROES[hKey].hp;
+        player.hp = player.maxHp;
+        log(`Herói selecionado: ${HEROES[hKey].n}`, "log-sys");
+        sync();
+    }
+}
+
+function move(loc) {
+    let target = loc ? loc.toUpperCase() : "";
+    if(LOCS.includes(target)) {
+        player.loc = target;
+        log(`Movido para ${target}`, "log-sys");
+        sync();
+    }
+}
+
+function attack() {
+    log("Atacando...", "log-sys");
+    db.ref(`rooms/${roomID}/players`).once('value', snap => {
+        let players = snap.val();
+        let hit = false;
+        for(let id in players) {
+            if(id !== myID && players[id].loc === player.loc && players[id].team !== player.team) {
+                sendEvent("damage", { to: id, dmg: HEROES[player.hero].atk, from: player.hero });
+                hit = true;
+            }
+        }
+        if(!hit) {
+            player.gold += 20;
+            player.xp += 15;
+            log("Farmando minions... +20 Ouro", "log-sys");
+        }
+        if(player.xp >= player.lvl * 100) { player.lvl++; player.xp = 0; log("LEVEL UP!", "log-ult"); }
+        sync();
+    });
+}
+
+function ult() {
+    if(player.cd.r > 0) return log("Ultimate em recarga!", "log-dmg");
+    player.cd.r = 60;
+    let h = player.hero;
+    log(`!!! ${HEROES[h].ult.toUpperCase()} !!!`, "log-ult");
+
+    if(h === 'cat') {
+        db.ref(`rooms/${roomID}/players`).once('value', snap => {
+            let players = snap.val();
+            for(let id in players) {
+                if(players[id].loc === player.loc && players[id].team !== player.team) {
+                    let damage = (players[id].hp < players[id].maxHp/2 || player.marks >= 100) ? 9999 : 50;
+                    sendEvent("damage", { to: id, dmg: damage, from: "CATACLISMO" });
+                }
+            }
+        });
+    }
+    if(h === 'bee') sendEventToLoc("stun", { dur: 10 });
+    if(h === 'turtle') { player.status = "INVULNERAVEL"; setTimeout(()=> {player.status="Normal"; sync();}, 8000); }
+    if(h === 'horse') { player.loc = prompt("Para onde?").toUpperCase(); }
+    sync();
+}
+
+function shop(args) {
+    if(args[1] === 'buy') {
+        let item = args[2];
+        if(player.gold >= 200) {
+            player.gold -= 200;
+            player.items.push(item);
+            log(`Item ${item} adquirido por 200g`, "log-sys");
+        }
+    } else {
+        log("LOJA: /buy {item} | Itens: espada, escudo, bota, cajado (200g)", "log-sys");
+    }
+    sync();
+}
+
+function flash() {
+    if(player.cd.f > 0) return;
+    player.cd.f = 60;
+    log("FLASH!", "log-ult");
+    sync();
+}
+
+function tick() {
+    if(player.cd.r > 0) player.cd.r--;
+    if(player.cd.f > 0) player.cd.f--;
+    if(player.loc === "BASE") player.hp = Math.min(player.maxHp, player.hp + 50);
+    if(player.hero === 'cat') player.marks = Math.min(100, player.marks + 2);
+    sync();
+}
+
+// --- SISTEMA DE REDE ---
+function sync() { if(roomID) db.ref(`rooms/${roomID}/players/${myID}`).set(player); }
+
+function sendEvent(type, data) { db.ref(`rooms/${roomID}/events`).push({ type, ...data }); }
+
+function sendEventToLoc(type, data) {
+    db.ref(`rooms/${roomID}/players`).once('value', snap => {
+        let players = snap.val();
+        for(let id in players) {
+            if(players[id].loc === player.loc && players[id].team !== player.team) {
+                sendEvent(type, { to: id, ...data });
+            }
+        }
+    });
+}
+
+function handleEvents(events) {
+    if(!events) return;
+    for(let key in events) {
+        let ev = events[key];
+        if(ev.to === myID) {
+            if(ev.type === "damage" && player.status !== "INVULNERAVEL") {
+                player.hp -= ev.dmg;
+                log(`DANO: -${ev.dmg} de ${ev.from}`, "log-dmg");
+            }
+            if(ev.type === "stun") { log("PARALISADO!", "log-dmg"); }
+            if(ev.type === "msg") { log(`[CHAT] ${ev.msg}`, "log-sys"); }
+            db.ref(`rooms/${roomID}/events/${key}`).remove();
+        }
+        if(player.hp <= 0) { player.hp = player.maxHp; player.loc = "BASE"; log("VOCE MORREU!", "log-dmg"); sync(); }
+    }
+}
+
+function chat(msg, all = false) {
+    if(all) sendEvent("msg", { to: "ALL", msg: `[GLOBAL] ${player.hero}: ${msg}` });
+    else log(`[CHAT] ${msg}`, "log-sys");
+}
+
+function renderHUD(players) {
+    let p = player;
+    let enemies = players ? Object.values(players).filter(pl => pl.loc === p.loc && pl.team !== p.team).map(pl => pl.hero) : [];
+    const hud = `
+[ ${p.loc} ]  ${enemies.length > 0 ? "⚠️ INIMIGOS: " + enemies.join(', ') : "Área Limpa"}
+HP: ${p.hp}/${p.maxHp} | Mana: ${p.mana} | Ouro: ${p.gold}g
+{ Nvl: ${p.lvl} | Heroi: ${p.hero ? HEROES[p.hero].n : '---'} } | XP: (${p.xp}/${p.lvl*100})
+MARCAS: ${p.marks}% | ULT: ${p.cd.r}s | FLASH: ${p.cd.f}s | STATUS: ${p.status}
+    `;
+    document.getElementById('ui-header').innerText = hud.trim();
+}
+
+function log(msg, cls) {
+    let out = document.getElementById('game-output');
+    let div = document.createElement('div');
+    div.className = "log " + (cls || "");
+    div.innerText = "> " + msg;
+    out.appendChild(div);
+    out.scrollTop = out.scrollHeight;
+}
+
+function showHelp() {
+    log("COMANDOS: /move {local}, /a (atacar), /r (ult), f (flash), $ (loja)", "log-sys");
+    log("LOCAIS: T1_MID, T2_MID, T3_MID, JUNGLE, MATAGAL1, NUCLEO", "log-sys");
+}
+</script>
 </body>
 </html>
