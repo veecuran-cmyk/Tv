@@ -160,17 +160,33 @@ input.addEventListener('keypress', async e => {
 
             case '/status':
                 print(`--- STATUS ATUAL: ${player.heroType} ---`);
-                print(`Skills Atuais: Q: ${player.q} | W: ${player.w} | E: ${player.e} | R: ${player.r}`);
-                print(`HP: ${player.hp}/${player.hp_max} | Gold: ${player.gold} | XP: ${player.xp}`);
-                break;
+                print(`name ${player.name}`);
+                print('-----------------------------');
+                print(`HP: ${player.hp}/${player.hp_max} | Gold: ${player.gold} | `);
+                print('----------------------------');
+                print(`Level: ${player.level}|XP: ${player.xp}`);
+                print('----------------------------');
+                print(`Atf: ${player.ataque_fisico}|Atm: ${player.ataque_magico}|DFF: ${player.def_fisica}|DFM: ${player.def_magica}`);
+                break;0
 
-            case '/stats': // Ver status de outro player
-                const sName = args[1];
-                if (allPlayers[sName]) {
-                    const s = allPlayers[sName];
-                    print(`[${sName}] HP: ${s.hp.toFixed(0)} | Hero: ${s.heroType} | Local: ${s.location}`);
-                }
-                break;
+            case '/stats':
+    const busca = args[1];
+    const alvo = busca ? allPlayers[busca] : player;
+
+    if (alvo) {
+        print(`--- STATUS DE: ${alvo.name}---`);
+        print(`Name:${alvo.heroType}`);
+        print('-----------------------------');
+        print(`HP: ${alvo.hp.toFixed(0)}/${alvo.hp_max} | Gold: ${alvo.gold} | `);
+        print('----------------------------');
+        print(`Level: ${alvo.level}|XP: ${alvo.xp}`);
+        print('----------------------------');
+        print(`Atf: ${alvo.ataque_fisico}|Atm: ${alvo.ataque_magico}|DFF: ${alvo.def_fisica}|DFM: ${alvo.def_magica}`);
+        print('----------------------------');
+    } else {
+        print(`Erro: Jogador "${busca}" não encontrado.`);
+    }
+    break;
 
             case '/limpar':
                 terminal.innerHTML = "";
