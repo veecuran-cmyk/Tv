@@ -48,7 +48,7 @@ input.addEventListener('keypress', async e => {
         switch (cmd) {
             case '/ajuda':
                 print("<b>MAPA:</b> /ir [local], /locais, /ver, /objetivos");
-                print("<b>LUTAR:</b> /atacar [alvo], /q [alvo], /w, /e, /r [alvo] [param]");
+                print("<b>LUTAR:</b> /atacar [alvo], /q [alvo], /w, /e, /r [alvo],/farmar");
                 print("<b>LOJA:</b> /loja, /comprar [item], /usar [item], /vender [item]");
                 print("<b>INFO:</b> /status, /stats [alvo], /limpar");
                 break;
@@ -129,7 +129,10 @@ input.addEventListener('keypress', async e => {
                 if (ultRes.success) save();
                 print(ultRes.msg);
                 break;
-
+            case '/farmar':
+                // Passamos o player, a função de salvar e a função de print para o outro arquivo
+                Entidades.executarFarm(player, save, print);
+                break;
             case '/loja':
                 print("<b>ITENS:</b> EscudoFisico, EscudoMagico, CuraPesada, Vampirismo, ImunidadeTemp");
                 print("<b>MINIS:</b> AtaqueFisico+1, AtaqueMagico+1, DefFisica+1");
