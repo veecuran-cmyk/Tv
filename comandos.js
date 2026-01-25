@@ -52,7 +52,14 @@ input.addEventListener('keypress', async e => {
                 print("<b>LOJA:</b> /loja, /comprar [item], /usar [item], /vender [item]");
                 print("<b>INFO:</b> /status, /stats [alvo], /limpar");
                 break;
-
+            case '/chat':
+                const mensagemParaEnviar = rawCmd.substring(6); 
+                if (mensagemParaEnviar) {
+                    chatRef.push(`${playerName}: ${mensagemParaEnviar}`);
+                } else {
+                    print("Uso: /chat [sua mensagem]");
+                }
+                break;
             case '/locais':
                 print("<b>Locais Disponíveis:</b> " + MAP_LOCATIONS.join(" | "));
                 break;
