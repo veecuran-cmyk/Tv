@@ -161,6 +161,7 @@ input.addEventListener('keypress', async e => {
                     print(`Item ${uItem} ativado.`);
                     save();
                 } else print("Você não tem esse item.");
+                
                 break;
 
             case '/status':
@@ -231,3 +232,17 @@ setInterval(() => {
         save();
     }
 }, 4000);
+
+// Este código roda sozinho sempre que alguém envia algo
+chatRef.limitToLast(10).on('child_added', (snapshot) => {
+    const dados = snapshot.val();
+    
+    // Se os dados forem um objeto (como no push acima)
+    if (typeof dados === 'object') {
+        print(`<b>${dados.autor}:</b> ${dados.texto}`);
+    } else {
+        // Caso o dado antigo fosse apenas uma string
+        print(`<span style="color: #00ff41">${dados}</span>`);
+    }
+});
+
