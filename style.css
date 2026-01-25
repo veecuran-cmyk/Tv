@@ -1,0 +1,149 @@
+/* style.css: THE PLAYABLE NIGHTMARE - 40s CYCLE */
+
+:root {
+    --green: #0bfe06;
+    --green-bright: #afffaf;
+    --bg: #010201;
+    --error-red: #ff0000;
+    --glitch-cyan: #00ffff;
+    --glitch-pink: #ff00ff;
+}
+
+body {
+    background-color: var(--bg);
+    color: var(--green);
+    font-family: 'Courier New', monospace;
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    
+    /* CICLO LONGO: 30s de TV Falha (Jogável) + 10s de Glitch Pesadão (Caos) */
+    animation: 
+        tv-flicker 0.2s infinite,
+        master-cycle 7s infinite linear;
+}
+
+/* 1. Ruído de TV Antiga (Interferência Constante) */
+body::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: url('https://upload.wikimedia.org/wikipedia/commons/5/5a/Static_noise.gif');
+    opacity: 0.07;
+    z-index: 5000;
+    pointer-events: none;
+    mix-blend-mode: screen;
+}
+
+/* 2. Scanlines e Ondas de Interferência */
+body::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: 
+        linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%),
+        repeating-linear-gradient(0deg, transparent 0%, rgba(0, 255, 0, 0.03) 0.5%, transparent 1%);
+    background-size: 100% 4px, 100% 1000px;
+    z-index: 5001;
+    pointer-events: none;
+    animation: vhs-drift 20s linear infinite;
+}
+
+/* 3. Terminal - Estabilidade para Leitura */
+#terminal {
+    flex: 1;
+    padding: 30px;
+    filter: contrast(1.1) brightness(1.1);
+    text-shadow: 1px 1px 0px rgba(0, 255, 0, 0.3);
+    overflow-y: auto;
+}
+
+#terminal div {
+    margin-bottom: 8px;
+    animation: row-jitter 5s infinite;
+}
+
+/* 4. Input - Fixo no fundo para não sumir */
+.input-container {
+    position: relative;
+    z-index: 6000;
+    background: rgba(0, 0, 0, 0.9);
+    border-top: 2px solid var(--green);
+    box-shadow: 0 -5px 15px rgba(0, 255, 0, 0.1);
+}
+
+#input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--green-bright);
+    font-size: 20px;
+    padding: 20px;
+    outline: none;
+    text-shadow: 0 0 5px var(--green);
+}
+
+/* --- KEYFRAMES DO CICLO DE JOGO vs CAOS --- */
+
+@keyframes master-cycle {
+    /* 0s a 30s: FASE JOGÁVEL (TV ANTIGA) */
+    0%, 75% { 
+        transform: none; 
+        filter: none; 
+        clip-path: none; 
+    }
+
+    /* 30s a 40s: GLITCH PESADÃO (INFERNO DIGITAL) */
+    76% { filter: invert(1) hue-rotate(90deg); transform: skewX(20deg); }
+    78% { clip-path: inset(40% 0 40% 0); transform: translateX(-100px); }
+    80% { clip-path: inset(10% 0 80% 0); transform: translateX(100px); filter: saturate(20); }
+    82% { transform: scale(1.5) rotate(2deg); filter: contrast(10) brightness(2); }
+    85% { clip-path: polygon(0 20%, 100% 20%, 100% 25%, 0 25%, 0 50%, 100% 50%, 100% 55%, 0 55%); }
+    88% { transform: skewY(-15deg); filter: hue-rotate(-180deg); }
+    92% { clip-path: none; transform: scale(0.9); filter: sepia(1) blur(2px); }
+    98%, 100% { filter: none; transform: none; }
+}
+
+/* Cintilação de monitor de fósforo */
+@keyframes tv-flicker {
+    0% { opacity: 0.95; }
+    50% { opacity: 1; }
+    100% { opacity: 0.9; }
+}
+
+/* Barra de erro VHS subindo devagar */
+@keyframes vhs-drift {
+    from { background-position: 0 0, 0 0; }
+    to { background-position: 0 0, 0 -1000px; }
+}
+
+/* Pequeno tremor nas linhas (instabilidade leve) */
+@keyframes row-jitter {
+    0%, 98% { transform: translateX(0); }
+    99% { transform: translateX(2px); color: var(--glitch-cyan); }
+}
+@keyframes text-glitch-color {
+    /* 0% a 75%: Verde terminal clássico */
+    0%, 75% { 
+        color: var(--green); 
+        text-shadow: 1px 1px 0px rgba(0, 255, 0, 0.3);
+    }
+
+    /* 76% a 100%: Cores de erro e glitch */
+    76% { color: var(--error-red); text-shadow: 2px 2px var(--glitch-cyan); }
+    80% { color: var(--glitch-pink); text-shadow: -2px -2px var(--green-bright); }
+    85% { color: white; text-shadow: 5px 0px var(--error-red); }
+    92% { color: var(--glitch-cyan); }
+    100% { color: var(--green); }
+}
+
+
+/* Destaques corrompidos */
+b { color: #fff; background: var(--error-red); padding: 0 4px; }
+i { color: var(--glitch-pink); font-weight: bold; }
+
+/* Scrollbar invisível mas funcional para manter o clima */
+#terminal::-webkit-scrollbar { width: 0; }
