@@ -4,6 +4,8 @@ let player = null;
 let playerName = null;
 let allPlayers = {};
 let worldState = {};
+let mortesSession = 0; // Contador de mortes da partida
+let isRespawning = false; // Trava para evitar comandos enquanto renasce
 
 const terminal = document.getElementById('terminal');
 const input = document.getElementById('input');
@@ -20,6 +22,7 @@ function print(msg) {
 
 // 1. Processador de Comandos Principal
 input.addEventListener('keypress', async e => {
+    if (isRespawning) return;
     if (e.key === 'Enter') {
         const rawCmd = input.value.trim();
         const args = rawCmd.split(' ');
@@ -35,7 +38,7 @@ input.addEventListener('keypress', async e => {
             if (heroFound) {
                 playerName = prompt("Digite seu nome de usuário:");
                 if (!playerName) return print("Nome obrigatório!");
-                player = { ...HEROES[heroFound], name: playerName, heroType: heroFound, location: 'BaseAliada', gold: 500, inventory: [], effects: [], xp: 0 };
+                player = { ...HEROES[heroFound], name: playerName, heroType: heroFound, location: 'BaseAliada', gold: 500, inventory: [], effects: [], xp: 0, mortes: 0};
                 playersRef.child(playerName).set(player);
                 print(`<span style="color: #00ff41">Bem-vindo, ${playerName}. Você é o portador do Miraculous de ${heroFound}!</span>`);
             } else {
@@ -163,7 +166,7 @@ input.addEventListener('keypress', async e => {
 
             case '/status':
                 print(`--- STATUS ATUAL: ${player.heroType} ---`);
-                print(`name ${player.name}`);
+                print(`name ${player.name}|mortes:${player.mortes}`);
                 print('-----------------------------');
                 print(`HP: ${player.hp}/${player.hp_max} | Gold: ${player.gold} | `);
                 print('----------------------------');
@@ -178,7 +181,7 @@ input.addEventListener('keypress', async e => {
 
     if (alvo) {
         print(`--- STATUS DE: ${alvo.name}---`);
-        print(`Name:${alvo.heroType}`);
+        print(`Name:${alvo.heroType}| mortes:${alvo.mortes}`);
         print('-----------------------------');
         print(`HP: ${alvo.hp.toFixed(0)}/${alvo.hp_max} | Gold: ${alvo.gold} | `);
         print('----------------------------');
@@ -212,13 +215,29 @@ playersRef.on('value', snap => {
         fixed.innerHTML = `[${player.heroType}] HP: ${player.hp.toFixed(0)} | Mana: ${player.mana.toFixed(0)} | Gold: ${player.gold} | Loc: ${player.location}`;
 
         // Lógica de Morte
-        if (player.hp <= 0) {
-            print("<b style='color:red'>VOCÊ FOI DERROTADO!</b>");
-            player.hp = player.hp_max;
-            player.location = 'BaseAliada';
-            save();
-        }
+        // Dentro do playersRef.on('value', snap => { ...
 
+// Lógica de Morte Simplificada no Terminal
+if (player.hp <= 0 && !isRespawning) {
+    isRespawning = true;
+    mortesSession++; // Aumenta o contador
+    player.mortes = (player.mortes || 0) + 1; // Soma 1 ao contador de mortes
+    print("<br>========================================");
+    print("<b style='color:red'>[SISTEMA] VOCÊ FOI DERROTADO!</b>");
+    print(`<b style='color:orange'>PLACAR DE MORTES: ${mortesSession}</b>`);
+    print("<i style='color:gray'>Recompondo dados do herói... aguarde 5s.</i>");
+    print("========================================<br>");
+
+    // Simulação de tempo de renascimento (bloqueio de 5 segundos)
+    setTimeout(() => {
+        player.hp = player.hp_max;
+        player.location = "BaseAliada";
+        isRespawning = false; // Libera o jogador
+        
+        save(); // Atualiza o Firebase
+        print("<b style='color:#00ff41'>[SISTEMA] Conexão restabelecida. Você renasceu na base.</b>");
+    }, 5000); // 5000ms = 5 segundos
+}
         // Sistema de Experiência e Level
         const xpNecessario = player.level * 100;
         if (player.xp >= xpNecessario) {
