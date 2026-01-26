@@ -173,7 +173,7 @@ input.addEventListener('keypress', async e => {
                 print(`Level: ${player.level}|XP: ${player.xp}`);
                 print('----------------------------');
                 print(`Atf: ${player.ataque_fisico}|Atm: ${player.ataque_magico}|DFF: ${player.def_fisica}|DFM: ${player.def_magica}`);
-                break;0
+                break;
 
             case '/stats':
     const busca = args[1];
