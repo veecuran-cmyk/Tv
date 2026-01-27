@@ -4,15 +4,15 @@ const RESPAWN_RECURSOS = {};
 const Entidades = {
     // 1. Definição dos Materiais na Selva
     MATERIAIS: {
-        "FragmentoComum": { nome: "Cristal de Mana", xp: 15, raridade: "Comum", respawn: 20000 },
+        "FragmentoComum": { nome: "Cristal de Mana", xp: 15, raridade: "Comum", respawn: 2000 },
     "FragmentoRaro": { nome: "Essência de Draco", xp: 45, raridade: "Raro", respawn: 45000 },
     "FragmentoLendario": { nome: "Núcleo Estelar", xp: 150, raridade: "Lendário", respawn: 120000 },
 
     // Comuns (Foco em progressão inicial)
-    "PedraFerrosa": { nome: "Minério de Ferro", xp: 10, raridade: "Comum", respawn: 15000 },
-    "FragmentoCobre": { nome: "Cobre Oxidado", xp: 12, raridade: "Comum", respawn: 18000 },
-    "SilicaBrilhante": { nome: "Sílica Vítrea", xp: 18, raridade: "Comum", respawn: 22000 },
-    "CarvaoVital": { nome: "Turfa de Carvão", xp: 20, raridade: "Comum", respawn: 25000 },
+    "PedraFerrosa": { nome: "Minério de Ferro", xp: 10, raridade: "Comum", respawn: 2000 },
+    "FragmentoCobre": { nome: "Cobre Oxidado", xp: 12, raridade: "Comum", respawn: 2000 },
+    "SilicaBrilhante": { nome: "Sílica Vítrea", xp: 18, raridade: "Comum", respawn: 2000 },
+    "CarvaoVital": { nome: "Turfa de Carvão", xp: 20, raridade: "Comum", respawn: 2000 },
 
     // Incomuns (O meio termo necessário)
     "LingotePrata": { nome: "Prata Lunar", xp: 25, raridade: "Incomum", respawn: 30000 },
@@ -72,6 +72,28 @@ const Entidades = {
         let materialKey = "FragmentoComum";
         if (sorteio > 0.95) materialKey = "FragmentoLendario";
         else if (sorteio > 0.70) materialKey = "FragmentoRaro";
+        else if (sorteio > 0.995) materialKey = "Divindade";
+else if (sorteio > 0.998) materialKey = "Eternium";
+else if (sorteio > 0.995) materialKey = "Divindade";
+else if (sorteio > 0.990) materialKey = "SangueDragao";
+else if (sorteio > 0.985) materialKey = "MateriaEscura";
+else if (sorteio > 0.980) materialKey = "LuzEterna";
+else if (sorteio > 0.960) materialKey = "EletroAzul";
+else if (sorteio > 0.940) materialKey = "PedraSolfar";
+else if (sorteio > 0.920) materialKey = "CristalVazio";
+else if (sorteio > 0.900) materialKey = "Orichalcum";
+else if (sorteio > 0.850) materialKey = "MithrilPuro";
+else if (sorteio > 0.800) materialKey = "AdamantiteBruto";
+else if (sorteio > 0.750) materialKey = "CobaltoCeleste";
+else if (sorteio > 0.700) materialKey = "ObsidianaFria";
+else if (sorteio > 0.600) materialKey = "PiritaDourada";
+else if (sorteio > 0.500) materialKey = "QuartzoRosa";
+else if (sorteio > 0.400) materialKey = "AcoNegro";
+else if (sorteio > 0.300) materialKey = "LingotePrata";
+else if (sorteio > 0.200) materialKey = "CarvaoVital";
+else if (sorteio > 0.100) materialKey = "SilicaBrilhante";
+else if (sorteio > 0.050) materialKey = "FragmentoCobre";
+else if (sorteio >0.99) materialKey= "PedraFerrosa";
 
         const mat = this.MATERIAIS[materialKey];
         
