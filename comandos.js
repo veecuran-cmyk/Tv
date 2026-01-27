@@ -135,7 +135,10 @@ input.addEventListener('keypress', async e => {
             case '/farmar':
     Entidades.iniciarCombate(player, save, print);
     break;
-
+// Exemplo de integração no seu sistema de comandos:
+case '/lutar':
+    Entidades.atacarManualmente(player, salvarProgresso, escreverNaTela);
+    break;
 // Adicione um comando de fuga
 case '/fugir':
     if (player.inCombat) {
