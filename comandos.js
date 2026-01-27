@@ -239,9 +239,7 @@ input.addEventListener('keypress', async e => {
 
         let totalOuro = 0;
         player.materiais.forEach(m => {
-            if (m === "FragmentoComum") totalOuro += 50;
-            if (m === "FragmentoRaro") totalOuro += 150;
-            if (m === "FragmentoLendario") totalOuro += 600;
+            
             // Comuns
 if (m === "PedraFerrosa") totalOuro += 30;
 if (m === "FragmentoCobre") totalOuro += 40;
