@@ -332,38 +332,46 @@ if (m === "Divindade") totalOuro += 10000;
                 
                 print("<br><i>Comando: /comprar [NomeDoItem]</i>");
                 break;
-            
-case '/comprar':
-    const itemNome = args[1];
+            case '/comprar':
+    const itemNome = args[1]; // Ex: AtaqueFisico+1 ou EscudoFisico
     if (!itemNome) return print("Use: /comprar [NomeDoItem]");
 
-    const buy = canBuyItem(player, itemNome); // Chama a lógica do itens.js
+    // canBuyItem retorna { can: bool, price: int, consume: array, reason: string }
+    const buy = canBuyItem(player, itemNome); 
     
     if (buy.can) {
+        // Verifica limite de inventário (6 espaços)
+        if (player.inventory.length >= 6 && !buy.consume.length) {
+            return print("❌ Inventário cheio!");
+        }
+
         player.gold -= buy.price;
 
-        // 1. Remove os ingredientes usados da receita
+        // 1. Remove os ingredientes do inventário
         if (buy.consume && buy.consume.length > 0) {
             buy.consume.forEach(cItem => {
                 const idx = player.inventory.indexOf(cItem);
                 if (idx > -1) player.inventory.splice(idx, 1);
             });
-            print(`<span style="color:gray">Ingredientes consumidos: ${buy.consume.join(', ')}</span>`);
         }
 
-        // 2. Adiciona o item ao inventário
-        player.inventory.push(itemNome);
-        print(`✅ Você adquiriu: <b>${itemNome}</b> por ${buy.price}g!`);
+        // 2. Aplica o efeito e salva no inventário
+        // Se for item de atributo (Mini Item), aplicamos direto
+        if (itemNome.includes('+')) {
+            applyItemEffect(player, itemNome);
+            print(`✅ Atributo expandido: <b>${itemNome}</b> por ${buy.price}g!`);
+        } else {
+            // Se for item completo/consumível, vai para o inventário
+            player.inventory.push(itemNome);
+            print(`✅ Você comprou: <b>${itemNome}</b> por ${buy.price}g!`);
+        }
 
-        // 3. IMPORTANTE: Aplica o efeito imediatamente se for um item de atributo (Mini Item)
-        // Se você quiser que o item dê status assim que comprar, precisa chamar isso:
-        applyItemEffect(player, itemNome);
-
-        save(); // Atualiza o Firebase
+        save(); 
     } else {
         print(`❌ ${buy.reason}`);
     }
     break;
+
 
             case '/usar':
                 const uItem = args[1];
