@@ -50,10 +50,10 @@ input.addEventListener('keypress', async e => {
         // --- DICIONÁRIO COMPLETO DE COMANDOS ---
         switch (cmd) {
             case '/ajuda':
-                print("<b>MAPA:</b> /ir [local], /locais, /ver, /objetivos,/coletar");
-                print("<b>LUTAR:</b> /atacar [alvo], /q [alvo], /w, /e, /r [alvo]");
+                print("<b>MAPA:</b> /ir [local], /locais, /ver, ,/coletar");
+                print("<b>LUTAR:</b> /atacar [alvo], /q [alvo], /w, /e, /r [alvo],/descansar");
                 print("<b>LOJA:</b> /loja, /comprar [item], /usar [item], /vender");
-                print("<b>INFO:</b> /status, /stats [alvo], /limpar");
+                print("<b>INFO:</b> /status, /stats [alvo], /limpar,/pivo,/estrutura");
                 break;
             
                 break;
@@ -68,14 +68,76 @@ input.addEventListener('keypress', async e => {
                 else print("Não há outros heróis aqui.");
                 break;
 
-            case '/objetivos':
-                print("--- Saúde das Torres (World State) ---");
-                // Aqui puxamos do gameStateRef definido no line.js
-                gameStateRef.once('value', snap => {
-                    const gs = snap.val();
-                    print(`Núcleo: ${gs.nucleo_hp} HP`);
-                    print(`Minions no Mid: ${gs.minions.Mid} | Solo: ${gs.minions.Solo} | Duo: ${gs.minions.Duo}`);
-                });
+            case '/descansar':
+                // 1. Verificação de Local
+                if (player.location !== "BaseAliada" && player.location !== "BaseInimiga") {
+                    return print("❌ Você só pode descansar no conforto e segurança da sua <b>Base</b>!");
+                }
+                
+                // 2. Verificação de Ouro (Custo de 10g)
+                if (player.gold < 10) {
+                    return print("❌ O estalajadeiro negou sua entrada! Você precisa de <b>10 de ouro</b> para descansar.");
+                }
+
+                // 3. Verificação se já está cheio
+                if (player.hp >= player.hp_max && player.mana >= player.mana_max) {
+                    return print("✅ Você já está totalmente recuperado e pronto para a luta!");
+                }
+
+                // 4. Execução do Descanso
+                player.gold -= 10; // Cobra a taxa
+
+                const curaHp = Math.floor(player.hp_max * 0.3); // Recupera 30% da vida
+                const curaMana = Math.floor(player.mana_max * 0.3); // Recupera 30% da mana
+
+                player.hp = Math.min(player.hp + curaHp, player.hp_max);
+                player.mana = Math.min(player.mana + curaMana, player.mana_max);
+
+                print("<b>[REPOUSO]</b> Você pagou 10g e descansou nos quartéis...");
+                print(`❤️ HP: +${curaHp} | ✨ Mana: +${curaMana} | 💰 Ouro: -10g`);
+                
+                save();
+                break;
+
+                case '/estrutura':
+                print("--- 🛡️ STATUS DAS DEFESAS DO MAPA ---");
+
+                // Função auxiliar para buscar HP e exibir com cor
+                const exibirHP = (nome, idLocal) => {
+                    // Tenta buscar o HP do Firebase (gameStateRef), se não houver, usa o padrão do line.js
+                    // Nota: 'worldState' deve refletir o que está no seu banco de dados
+                    let hpAtual = (worldState && worldState.torres && worldState.torres[idLocal]) 
+                                  ? worldState.torres[idLocal] 
+                                  : INITIAL_TOWERS_HP;
+                    
+                    // Se for o núcleo, o HP máximo é diferente
+                    let hpMax = idLocal === 'Nucleo' ? NUCLEO_MAX_HP : INITIAL_TOWERS_HP;
+                    
+                    let percentual = Math.round((hpAtual / hpMax) * 100);
+                    let cor = percentual > 60 ? "#00ff41" : (percentual > 25 ? "yellow" : "red");
+
+                    print(`🔹 <b>${nome}:</b> <span style="color:${cor}">${hpAtual}/${hpMax} HP</span>`);
+                };
+
+                print("<b style='color:cyan'>[ROTA SOLO]</b>");
+                exibirHP("Torre T1", "Solo:T1");
+                exibirHP("Torre T2", "Solo:T2");
+                exibirHP("Torre T3", "Solo:T3");
+
+                print("<br><b style='color:cyan'>[ROTA MID]</b>");
+                exibirHP("Torre T1", "Mid:T1");
+                exibirHP("Torre T2", "Mid:T2");
+                exibirHP("Torre T3", "Mid:T3");
+
+                print("<br><b style='color:cyan'>[ROTA DUO]</b>");
+                exibirHP("Torre T1", "Duo:T1");
+                exibirHP("Torre T2", "Duo:T2");
+                exibirHP("Torre T3", "Duo:T3");
+
+                print("<br><b style='color:orange'>[OBJETIVO FINAL]</b>");
+                exibirHP("NÚCLEO CENTRAL", "Nucleo");
+
+                print("---------------------------------------");
                 break;
 
             case '/ir':
@@ -86,6 +148,53 @@ input.addEventListener('keypress', async e => {
                     print(`Movendo para ${dest}...`);
                     save();
                 } else print("Local inválido. Use /locais.");
+                break;
+
+                case '/pivo':
+                // 1. Definição dos Custos
+                const custoOuro = 200;
+                const custoMana = 50;
+                const custoVidaPercentual = 0.4; // 40% da vida atual vai embora no sacrifício
+
+                // 2. Verificações de Segurança
+                if (player.inCombat) {
+                    return print("❌ Você não pode desertar enquanto está em combate!");
+                }
+                if (player.gold < custoOuro) {
+                    return print(`❌ Ouro insuficiente! Você precisa de <b>${custoOuro}g</b> para subornar os guardas.`);
+                }
+                if (player.mana < custoMana) {
+                    return print(`❌ Mana insuficiente! A troca exige <b>${custoMana} de mana</b>.`);
+                }
+
+                // 3. Lógica de Troca de Time e Base
+                const timeAntigo = player.heroType;
+                let novoTime = (timeAntigo === "Heroi") ? "Vilao" : "Heroi";
+                let novaBase = (novoTime === "Vilao") ? "BaseInimiga" : "BaseAliada";
+
+                // 4. Aplicação dos Custos e Mudança
+                player.gold -= custoOuro;
+                player.mana -= custoMana;
+                
+                // Calcula perda de vida (sacrifício)
+                const perdaVida = Math.floor(player.hp * custoVidaPercentual);
+                player.hp -= perdaVida;
+                
+                // Garante que o player não morra na troca (fica com pelo menos 1 HP)
+                if (player.hp <= 0) player.hp = 1;
+
+                player.heroType = novoTime;
+                player.location = novaBase;
+
+                // 5. Feedback Visual
+                print("======= ⚠️ DESERÇÃO EXECUTADA =======");
+                print(`💸 Pago: <b>${custoOuro} Ouro</b>.`);
+                print(`✨ Gasto: <b>${custoMana} Mana</b>.`);
+                print(`🩸 Sacrifício: <b>-${perdaVida} HP</b>.`);
+                print(`🎭 Você agora é um <b>${novoTime}</b> e foi movido para <b>${novaBase}</b>.`);
+                print("====================================");
+
+                save();
                 break;
 
             case '/atacar':
