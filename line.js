@@ -6,7 +6,7 @@ const MAP_LOCATIONS = [
     'Mid:T1', 'Mid:T2', 'Mid:T3', 
     'Solo:T1', 'Solo:T2', 'Solo:T3',
     'Duo:T1', 'Duo:T2', 'Duo:T3',
-    'Jungle:Matagal1', 'Jungle:Matagal2', 'Jungle:Boss1', 'Jungle:Boss2',
+    'Jungle:Matagal1', 'Jungle:Matagal2', 'Jungle:4', 'Jungle:5',
     'Nucleo'
 ];
 
