@@ -34,12 +34,19 @@ const RECIPES = {
 const COMPLETE_ITEMS = Object.keys(RECIPES);
 
 // 3. Cálculo de Preços
+// No itens.js, garanta que os preços base estejam acessíveis
 const ITEM_PRICES = {};
+
+// Preços dos Mini Itens (150g a 600g)
 MINI_ITEMS.forEach(item => {
     const level = parseInt(item.split('+')[1]);
     ITEM_PRICES[item] = level * 150; 
 });
 
+// Preços dos Itens Completos (Baseado no custo da receita)
+Object.entries(RECIPES).forEach(([nome, dados]) => {
+    ITEM_PRICES[nome] = dados.custo; // Usa o custo definido na RECIPES
+});
 // Adiciona preços base dos completos (para exibição)
 COMPLETE_ITEMS.forEach(item => {
     let baseCost = RECIPES[item].custo;
