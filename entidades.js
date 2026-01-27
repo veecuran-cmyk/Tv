@@ -1,113 +1,251 @@
-// entidades.js - Sistema de Combate v3 (Correção de Travamento e Recompensas)
-const RESPAWN_MONSTROS = {}; 
-let combatTimeout = null; 
+// entidades.js — Sistema Avançado de Combate Automático Animado
+
+const RESPAWN_MONSTROS = {};
+const COMBATES_ATIVOS = new Map();
+
+function clone(obj) {
+    return JSON.parse(JSON.stringify(obj));
+}
 
 const Entidades = {
-    // --- BESTIÁRIO TURBINADO (XP e Gold aumentados em 300%) ---
+
+    // =====================================================
+    // BASE DE NPCS
+    // =====================================================
     NPCS: {
-        "minion": { nome: "Tropa de Infantaria", hp_max: 150, dano: 18, gold: 150, xp: 100, respawn: 10000 },
-        "super_minion": { nome: "Tropa de Cerco", hp_max: 500, dano: 45, gold: 400, xp: 350, respawn: 20000 },
-        "lobo": { nome: "Lobo das Trevas", hp_max: 300, dano: 35, gold: 300, xp: 250, respawn: 30000 },
-        "golem": { nome: "Golem de Pedra", hp_max: 900, dano: 25, gold: 600, xp: 500, respawn: 30000 },
-        "aranha": { nome: "Tecelã da Noite", hp_max: 280, dano: 60, gold: 550, xp: 450, respawn: 30000 },
-        "dragao": { nome: "Dragão Elemental", hp_max: 3000, dano: 100, gold: 3000, xp: 2500, respawn: 120000 },
-        "herald": { nome: "Arauto do Caos", hp_max: 2000, dano: 80, gold: 2000, xp: 1500, respawn: 90000 },
-        "boss_rio": { nome: "Sentimonstro Gigante", hp_max: 4500, dano: 140, gold: 5000, xp: 4000, respawn: 180000 },
-        "tita": { nome: "Titã de Akuma", hp_max: 9500, dano: 220, gold: 15000, xp: 10000, respawn: 300000 },
-        "torre": { nome: "Torre Defensiva", hp_max: 3000, dano: 160, gold: 1500, xp: 1000, respawn: 0 },
-        "nucleo": { nome: "Núcleo Principal", hp_max: 8000, dano: 280, gold: 50000, xp: 20000, respawn: 0 }
+        minion: { nome: "Tropa de Infantaria", hp_max: 150, dano: 15, gold: 25, xp: 20, respawn: 30000 },
+        super_minion: { nome: "Tropa de Cerco", hp_max: 400, dano: 40, gold: 60, xp: 50, respawn: 45000 },
+        boss_rio: { nome: "Sentimonstro Gigante", hp_max: 3500, dano: 90, gold: 600, xp: 500, respawn: 180000 },
+        torre: { nome: "Torre Defensiva", hp_max: 2500, dano: 120, gold: 300, xp: 200, respawn: 300000 },
+        nucleo: { nome: "Núcleo Principal", hp_max: 5000, dano: 200, gold: 1000, xp: 1000, respawn: 0 }
     },
 
-    obterInimigoLocal: function(local, heroType) {
-        if (local.includes("Jungle")) {
-            const selva = ["lobo", "golem", "aranha", "dragao", "herald"];
-            const ref = this.NPCS[selva[Math.floor(Math.random() * selva.length)]];
-            return { ...ref, hp: ref.hp_max };
+    // =====================================================
+    // UTILIDADES VISUAIS
+    // =====================================================
+    renderBarra(atual, max, size = 18) {
+        const pct = Math.max(0, atual) / max;
+        const filled = Math.round(pct * size);
+        return "█".repeat(filled) + "░".repeat(size - filled);
+    },
+
+    animarTurno({ printFunc, textos, delay = 450 }) {
+        return new Promise(resolve => {
+
+            let i = 0;
+
+            const seq = setInterval(() => {
+
+                printFunc(textos[i]);
+                i++;
+
+                if (i >= textos.length) {
+                    clearInterval(seq);
+                    resolve();
+                }
+
+            }, delay);
+        });
+    },
+
+    // =====================================================
+    // JUNGLE
+    // =====================================================
+    gerarMonstroJungle() {
+
+        const monstros = [
+            { nome: "Lobo das Trevas", hp_max: 300, dano: 25, gold: 70 },
+            { nome: "Golem de Pedra", hp_max: 700, dano: 15, gold: 130 },
+            { nome: "Aranha Gigante", hp_max: 280, dano: 55, gold: 140 }
+        ];
+
+        const base = monstros[Math.floor(Math.random() * monstros.length)];
+
+        return {
+            ...base,
+            hp: base.hp_max,
+            xp: Math.floor(base.gold * 0.8),
+            respawn: 60000
+        };
+    },
+
+    // =====================================================
+    // SPAWN
+    // =====================================================
+    obterInimigoLocal(local, heroType) {
+
+        if (local.includes("Jungle")) return this.gerarMonstroJungle();
+
+        if (local === "Rio") {
+            const mob = clone(this.NPCS.boss_rio);
+            mob.hp = mob.hp_max;
+            return mob;
         }
-        if (local === "Rio") return { ...this.NPCS.boss_rio, hp: this.NPCS.boss_rio.hp_max }; 
-        if (local === "BaseInimiga") return { ...this.NPCS.nucleo, hp: this.NPCS.nucleo.hp_max };
+
+        if (local === "BaseInimiga") {
+            const mob = clone(this.NPCS.nucleo);
+            mob.hp = mob.hp_max;
+            return mob;
+        }
+
         if (local.includes("T") && !local.includes(heroType)) {
-            const template = local.includes("T3") ? this.NPCS.super_minion : this.NPCS.minion;
-            return { ...template, hp: template.hp_max };
+
+            const base = local.includes("T3")
+                ? this.NPCS.super_minion
+                : this.NPCS.minion;
+
+            const mob = clone(base);
+            mob.hp = mob.hp_max;
+            return mob;
         }
+
         return null;
     },
 
-    iniciarCombate: function(player, saveFunc, printFunc) {
-        if (player.inCombat === true) {
-            return printFunc("⚠️ <b>Você já está em batalha!</b> Aguarde terminar.");
-        }
+    // =====================================================
+    // COMBATE
+    // =====================================================
+    iniciarCombate(player, saveFunc, printFunc) {
 
+        const id = player.id || player.nome;
         const loc = player.location;
-        if (RESPAWN_MONSTROS[loc] && Date.now() < RESPAWN_MONSTROS[loc]) {
-            const espera = Math.ceil((RESPAWN_MONSTROS[loc] - Date.now()) / 1000);
-            return printFunc(`⏳ Área vazia. Respawn em ${espera}s.`);
+
+        if (player.inCombat)
+            return printFunc("⚠️ Você já está em combate!");
+
+        const respawnKey = loc;
+
+        if (RESPAWN_MONSTROS[respawnKey] && Date.now() < RESPAWN_MONSTROS[respawnKey]) {
+            const t = Math.ceil((RESPAWN_MONSTROS[respawnKey] - Date.now()) / 1000);
+            return printFunc(`⏳ Local vazio. Respawn em ${t}s.`);
         }
 
-        let mob = this.obterInimigoLocal(loc, player.heroType);
-        if (!mob) return printFunc("🍃 Nada para farmar aqui.");
+        const mob = this.obterInimigoLocal(loc, player.heroType);
 
-        player.inCombat = true; 
-        printFunc(`⚔️ <b>FARM INICIADO: ${mob.nome}</b>`);
+        if (!mob) return printFunc("Tudo calmo por aqui.");
 
-        const executarTurno = () => {
-            if (!player.inCombat) return;
+        player.effects ??= [];
+        player.inCombat = true;
 
-            // DANO DO JOGADOR
-            let danoP = Math.floor(Math.max(player.ataque_fisico, player.ataque_magico) * (0.9 + Math.random() * 0.2));
-            mob.hp -= danoP;
+        let turno = 0;
+
+        printFunc(`<br>⚔️ <b>COMBATE AUTOMÁTICO INICIADO</b>`);
+        printFunc(`Inimigo: <span style="color:red">${mob.nome}</span> (${mob.hp} HP)`);
+
+        const rodarTurno = async () => {
+
+            turno++;
+
+            let eventos = [];
+
+            // ===== ATAQUE PLAYER =====
+            let danoPlayer =
+                Math.max(player.ataque_fisico, player.ataque_magico) *
+                (0.9 + Math.random() * 0.2);
+
+            let crit = Math.random() < 0.1;
+            if (crit) danoPlayer *= 1.5;
+
+            mob.hp -= danoPlayer;
+
+            eventos.push(`⚔️ Você investe contra ${mob.nome}...`);
+            eventos.push(crit ? "⚡ GOLPE CRÍTICO!" : "💥 Golpe certeiro!");
+            eventos.push(`🩸 Inimigo: ${this.renderBarra(mob.hp, mob.hp_max)}`);
 
             if (mob.hp <= 0) {
+                await this.animarTurno({ printFunc, textos: eventos });
                 this.finalizarCombate(player, mob, true, saveFunc, printFunc);
                 return;
             }
 
-            // DANO DO MONSTRO
-            let reducao = (player.def_fisica + player.def_magica) * 0.2;
-            let danoM = Math.max(5, Math.floor(mob.dano - reducao));
-            player.hp -= danoM;
+            // ===== ATAQUE MOB =====
+            const reducao =
+                ((player.def_fisica || 0) +
+                    (player.def_magica || 0)) *
+                0.3;
 
-            printFunc(`🗡️ <b>-${danoP} HP</b> no inimigo | 🩸 Você: <b>${player.hp.toFixed(0)}</b>`);
+            const danoRecebido = Math.max(5, mob.dano - reducao);
+
+            if (player.effects.includes("vampirismo")) {
+                const cura = danoPlayer * 0.15;
+                player.hp = Math.min(player.hp + cura, player.hp_max);
+                eventos.push(`🩸 Vampirismo cura +${cura.toFixed(0)}`);
+            }
+
+            player.hp -= danoRecebido;
+
+            eventos.push(`👹 ${mob.nome} contra-ataca!`);
+            eventos.push(`❤️ Você: ${this.renderBarra(player.hp, player.hp_max)}`);
+
+            await this.animarTurno({ printFunc, textos: eventos });
+
             saveFunc();
 
             if (player.hp <= 0) {
-                this.finalizarCombate(player, mob, false, saveFunc, printFunc);
-                return;
-            }
 
-            // Próximo turno rápido (600ms)
-            combatTimeout = setTimeout(executarTurno, 600);
+                printFunc(`<b style="color:red">💀 VOCÊ CAIU!</b>`);
+
+                this.finalizarCombate(player, mob, false, saveFunc, printFunc);
+
+                this.entidadeAtacaEstrutura(loc, mob.dano, printFunc);
+            }
         };
 
-        executarTurno();
+        const interval = setInterval(rodarTurno, 2300);
+
+        COMBATES_ATIVOS.set(id, interval);
     },
 
-    pararCombate: function(player) {
-        player.inCombat = false; 
-        if (combatTimeout) {
-            clearTimeout(combatTimeout);
-            combatTimeout = null;
+    pararCombate(player) {
+
+        const id = player.id || player.nome;
+
+        const interval = COMBATES_ATIVOS.get(id);
+
+        if (interval) {
+            clearInterval(interval);
+            COMBATES_ATIVOS.delete(id);
         }
+
+        player.inCombat = false;
     },
 
-    finalizarCombate: function(player, mob, vitoria, saveFunc, printFunc) {
-        this.pararCombate(player); // Primeiro libera o player
-        
-        if (vitoria) {
-            printFunc(`--------------------------------`);
-            printFunc(`🏆 <b>VITÓRIA CONTRA ${mob.nome.toUpperCase()}!</b>`);
-            printFunc(`💰 <b>+${mob.gold} GOLD</b> | ✨ <b>+${mob.xp} XP</b>`);
-            printFunc(`--------------------------------`);
-            
+    finalizarCombate(player, mob, venceu, saveFunc, printFunc) {
+
+        this.pararCombate(player);
+
+        if (venceu) {
+
+            printFunc(`<br>🏆 <b>VITÓRIA!</b> ${mob.nome} foi derrotado.`);
+            printFunc(`💰 +${mob.gold} ouro | ✨ +${mob.xp} XP`);
+
             player.gold += mob.gold;
             player.xp += mob.xp;
-            
-            if (mob.respawn > 0) RESPAWN_MONSTROS[player.location] = Date.now() + mob.respawn;
-        } else {
-            printFunc(`💀 <b>VOCÊ CAIU EM COMBATE!</b>`);
+
+            if (mob.respawn > 0) {
+                RESPAWN_MONSTROS[player.location] =
+                    Date.now() + mob.respawn;
+            }
         }
-        
-        // SALVAMENTO CRÍTICO: Força o Firebase a registrar o inCombat = false
+
         saveFunc();
+    },
+
+    // =====================================================
+    // IA DE ESTRUTURAS
+    // =====================================================
+    entidadeAtacaEstrutura(local, dano, printFunc) {
+
+        if (local.includes("Base") || local.includes("T")) {
+
+            printFunc(
+                `<span style="color:orange">⚠️ Estrutura em ${local} sofreu ${dano} dano!</span>`
+            );
+
+            // Firebase:
+            // db.ref("estruturas").child(local).transaction(v => v - dano);
+        }
     }
 };
+
+module.exports = Entidades;
