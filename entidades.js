@@ -41,22 +41,37 @@ const Entidades = {
 
     // 2. IA das Torres e Núcleo (Defesa Automática)
     // Chamado pelo loop global para defender a base
-    verificarDefesa: function(player, printFunc) {
-        const loc = player.location;
+    // entidades.js - IA de Defesa Atualizada
+verificarDefesa: function(player, printFunc) {
+    const loc = player.location;
+    const eHeroi = player.heroType === "Heroi";
+    const eVilao = player.heroType === "Vilao";
+
+    // Define se o local atual é hostil para o jogador
+    let eLocalInimigo = false;
+
+    if (eHeroi) {
+        // Se eu sou Herói, locais com "Inimiga" ou torres de vilões (se houver prefixo) são hostis
+        if (loc.includes("Inimiga") || loc.includes("Vilao")) eLocalInimigo = true;
+    } else if (eVilao) {
+        // Se eu sou Vilão, locais com "Aliada" ou "Heroi" são hostis
+        if (loc.includes("Aliada") || loc.includes("Heroi")) eLocalInimigo = true;
+    }
+
+    // Se o player estiver em uma estrutura inimiga detectada acima
+    if (eLocalInimigo) {
+        // Aumenta o dano se for o Núcleo (Base), senão dano de Torre (T1, T2...)
+        let danoBase = (loc.includes("Base")) ? 150 : 80;
         
-        // Se o player estiver em uma estrutura inimiga
-        if ((loc.includes("T") || loc === "BaseInimiga") && !loc.includes(player.heroType)) {
-            let danoBase = loc === "BaseInimiga" ? 150 : 80;
-            
-            // Redução por Defesa do Player
-            let danoFinal = Math.max(10, danoBase - (player.def_fisica * 0.4));
-            player.hp -= danoFinal;
-            
-            printFunc(`<span style="color:#ff4444">⚠️ A <b>${loc}</b> está te alvejando! Dano: ${danoFinal.toFixed(0)}</span>`);
-            return true;
-        }
-        return false;
-    },
+        // Redução por Defesa do Player
+        let danoFinal = Math.max(10, danoBase - (player.def_fisica * 0.4));
+        player.hp -= danoFinal;
+        
+        printFunc(`<span style="color:#ff4444">⚠️ A estrutura inimiga em <b>${loc}</b> está te alvejando! Dano: ${danoFinal.toFixed(0)}</span>`);
+        return true;
+    }
+    return false;
+},
 
     // 3. Lógica de Coleta (Antigo Farmar)
     coletarNaJungle: function(player, printFunc) {
