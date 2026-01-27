@@ -73,7 +73,6 @@ const Entidades = {
         if (sorteio > 0.95) materialKey = "FragmentoLendario";
         else if (sorteio > 0.70) materialKey = "FragmentoRaro";
         else if (sorteio > 0.995) materialKey = "Divindade";
-else if (sorteio > 0.998) materialKey = "Eternium";
 else if (sorteio > 0.995) materialKey = "Divindade";
 else if (sorteio > 0.990) materialKey = "SangueDragao";
 else if (sorteio > 0.985) materialKey = "MateriaEscura";
