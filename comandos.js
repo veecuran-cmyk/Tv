@@ -99,46 +99,7 @@ input.addEventListener('keypress', async e => {
                 save();
                 break;
 
-                case '/estrutura':
-                print("--- 🛡️ STATUS DAS DEFESAS DO MAPA ---");
-
-                // Função auxiliar para buscar HP e exibir com cor
-                const exibirHP = (nome, idLocal) => {
-                    // Tenta buscar o HP do Firebase (gameStateRef), se não houver, usa o padrão do line.js
-                    // Nota: 'worldState' deve refletir o que está no seu banco de dados
-                    let hpAtual = (worldState && worldState.torres && worldState.torres[idLocal]) 
-                                  ? worldState.torres[idLocal] 
-                                  : INITIAL_TOWERS_HP;
-                    
-                    // Se for o núcleo, o HP máximo é diferente
-                    let hpMax = idLocal === 'Nucleo' ? NUCLEO_MAX_HP : INITIAL_TOWERS_HP;
-                    
-                    let percentual = Math.round((hpAtual / hpMax) * 100);
-                    let cor = percentual > 60 ? "#00ff41" : (percentual > 25 ? "yellow" : "red");
-
-                    print(`🔹 <b>${nome}:</b> <span style="color:${cor}">${hpAtual}/${hpMax} HP</span>`);
-                };
-
-                print("<b style='color:cyan'>[ROTA SOLO]</b>");
-                exibirHP("Torre T1", "Solo:T1");
-                exibirHP("Torre T2", "Solo:T2");
-                exibirHP("Torre T3", "Solo:T3");
-
-                print("<br><b style='color:cyan'>[ROTA MID]</b>");
-                exibirHP("Torre T1", "Mid:T1");
-                exibirHP("Torre T2", "Mid:T2");
-                exibirHP("Torre T3", "Mid:T3");
-
-                print("<br><b style='color:cyan'>[ROTA DUO]</b>");
-                exibirHP("Torre T1", "Duo:T1");
-                exibirHP("Torre T2", "Duo:T2");
-                exibirHP("Torre T3", "Duo:T3");
-
-                print("<br><b style='color:orange'>[OBJETIVO FINAL]</b>");
-                exibirHP("NÚCLEO CENTRAL", "Nucleo");
-
-                print("---------------------------------------");
-                break;
+                
 
             case '/ir':
                 if (player.inCombat) return print("🚫 Você não pode viajar enquanto está em combate!");
@@ -149,54 +110,95 @@ input.addEventListener('keypress', async e => {
                     save();
                 } else print("Local inválido. Use /locais.");
                 break;
+                case '/estrutura':
+                const filtro = args[1] ? args[1].toLowerCase() : 'tudo';
+                print(`--- 🛡️ STATUS DAS DEFESAS (${filtro.toUpperCase()}) ---`);
+
+                const exibirHP = (nome, idLocal) => {
+                    let hpAtual = (worldState && worldState.torres && worldState.torres[idLocal]) 
+                                  ? worldState.torres[idLocal] 
+                                  : INITIAL_TOWERS_HP;
+                    
+                    let hpMax = idLocal === 'Nucleo' ? NUCLEO_MAX_HP : INITIAL_TOWERS_HP;
+                    let percentual = Math.round((hpAtual / hpMax) * 100);
+                    let cor = percentual > 60 ? "#00ff41" : (percentual > 25 ? "yellow" : "red");
+
+                    print(`🔹 <b>${nome}:</b> <span style="color:${cor}">${hpAtual}/${hpMax} HP</span>`);
+                };
+
+                // Define o que é "aliado" ou "inimigo" com base no time do jogador
+                const meuTime = player.heroType; // "Heroi" ou "Vilao"
+                const mostrarHeroi = (filtro === 'tudo' || (filtro === 'aliada' && meuTime === 'Heroi') || (filtro === 'inimiga' && meuTime === 'Vilao'));
+                const mostrarVilao = (filtro === 'tudo' || (filtro === 'aliada' && meuTime === 'Vilao') || (filtro === 'inimiga' && meuTime === 'Heroi'));
+
+                if (mostrarHeroi) {
+                    print("<br><b style='color:cyan'>[ESTRUTURAS HERÓI]</b>");
+                    exibirHP("Solo T1", "Solo:T1"); exibirHP("Solo T2", "Solo:T2"); exibirHP("Solo T3", "Solo:T3");
+                    exibirHP("Mid T1", "Mid:T1");   exibirHP("Mid T2", "Mid:T2");   exibirHP("Mid T3", "Mid:T3");
+                    exibirHP("Duo T1", "Duo:T1");   exibirHP("Duo T2", "Duo:T2");   exibirHP("Duo T3", "Duo:T3");
+                    if (meuTime === 'Vilao') exibirHP("NÚCLEO INIMIGO", "Nucleo");
+                    else exibirHP("NÚCLEO ALIADO", "Nucleo");
+                }
+
+                if (mostrarVilao) {
+                    print("<br><b style='color:red'>[ESTRUTURAS VILÃO]</b>");
+                    // Nota: Se o seu line.js diferenciar as torres por time (ex: Solo:T1:Vilao), 
+                    // ajuste os IDs abaixo. Caso contrário, ele mostra o status global da rota.
+                    exibirHP("Solo T1", "Solo:T1"); exibirHP("Solo T2", "Solo:T2"); exibirHP("Solo T3", "Solo:T3");
+                    exibirHP("Mid T1", "Mid:T1");   exibirHP("Mid T2", "Mid:T2");   exibirHP("Mid T3", "Mid:T3");
+                    exibirHP("Duo T1", "Duo:T1");   exibirHP("Duo T2", "Duo:T2");   exibirHP("Duo T3", "Duo:T3");
+                    if (meuTime === 'Heroi') exibirHP("NÚCLEO INIMIGO", "Nucleo");
+                    else exibirHP("NÚCLEO ALIADO", "Nucleo");
+                }
+
+                print("<br><i>Use /estrutura aliada ou /estrutura inimiga para filtrar.</i>");
+                break;
 
                 case '/pivo':
-                // 1. Definição dos Custos
+                const escolha = args[1] ? args[1].toLowerCase() : null;
+                const timesValidos = ["heroi", "vilao"];
+
+                // 1. Verificação de Argumento
+                if (!escolha || !timesValidos.includes(escolha)) {
+                    return print("❌ Escolha um lado! Use: <b>/pivo heroi</b> ou <b>/pivo vilao</b>");
+                }
+
+                // Traduz a escolha para o formato do sistema
+                const novoTime = escolha === "heroi" ? "Heroi" : "Vilao";
+
+                // 2. Impede trocar para o mesmo time que já está
+                if (player.heroType === novoTime) {
+                    return print(`❌ Você já faz parte do time dos <b>${novoTime}s</b>!`);
+                }
+
+                // 3. Custos de Troca
                 const custoOuro = 200;
                 const custoMana = 50;
-                const custoVidaPercentual = 0.4; // 40% da vida atual vai embora no sacrifício
+                const custoVidaPercentual = 0.4;
 
-                // 2. Verificações de Segurança
-                if (player.inCombat) {
-                    return print("❌ Você não pode desertar enquanto está em combate!");
-                }
-                if (player.gold < custoOuro) {
-                    return print(`❌ Ouro insuficiente! Você precisa de <b>${custoOuro}g</b> para subornar os guardas.`);
-                }
-                if (player.mana < custoMana) {
-                    return print(`❌ Mana insuficiente! A troca exige <b>${custoMana} de mana</b>.`);
-                }
+                if (player.inCombat) return print("❌ Você não pode desertar em combate!");
+                if (player.gold < custoOuro) return print(`❌ Ouro insuficiente (${custoOuro}g necessários).`);
+                if (player.mana < custoMana) return print(`❌ Mana insuficiente (${custoMana} de mana necessária).`);
 
-                // 3. Lógica de Troca de Time e Base
-                const timeAntigo = player.heroType;
-                let novoTime = (timeAntigo === "Heroi") ? "Vilao" : "Heroi";
-                let novaBase = (novoTime === "Vilao") ? "BaseInimiga" : "BaseAliada";
-
-                // 4. Aplicação dos Custos e Mudança
+                // 4. Aplicação da Mudança
                 player.gold -= custoOuro;
                 player.mana -= custoMana;
                 
-                // Calcula perda de vida (sacrifício)
                 const perdaVida = Math.floor(player.hp * custoVidaPercentual);
-                player.hp -= perdaVida;
-                
-                // Garante que o player não morra na troca (fica com pelo menos 1 HP)
-                if (player.hp <= 0) player.hp = 1;
+                player.hp = Math.max(1, player.hp - perdaVida);
 
                 player.heroType = novoTime;
-                player.location = novaBase;
+                // Define a base de destino com base no novo time
+                player.location = (novoTime === "Vilao") ? "BaseInimiga" : "BaseAliada";
 
-                // 5. Feedback Visual
-                print("======= ⚠️ DESERÇÃO EXECUTADA =======");
-                print(`💸 Pago: <b>${custoOuro} Ouro</b>.`);
-                print(`✨ Gasto: <b>${custoMana} Mana</b>.`);
-                print(`🩸 Sacrifício: <b>-${perdaVida} HP</b>.`);
-                print(`🎭 Você agora é um <b>${novoTime}</b> e foi movido para <b>${novaBase}</b>.`);
+                print("======= 🎭 TROCA DE LEALDADE =======");
+                print(`Você agora é um <b>${novoTime}</b>!`);
+                print(`💰 Pago: ${custoOuro}g | ✨ Gasto: ${custoMana}m | 🩸 Sacrifício: -${perdaVida} HP`);
+                print(`📍 Movido para: <b>${player.location}</b>`);
                 print("====================================");
 
                 save();
                 break;
-
             case '/atacar':
                 const targetName = args[1];
                 if (!targetName) return print("Use: /atacar [NomeInimigo ou NomeTorre]");
