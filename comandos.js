@@ -51,8 +51,8 @@ input.addEventListener('keypress', async e => {
         switch (cmd) {
             case '/ajuda':
                 print("<b>MAPA:</b> /ir [local], /locais, /ver, /objetivos");
-                print("<b>LUTAR:</b> /atacar [alvo], /q [alvo], /w, /e, /r [alvo],/farmar");
-                print("<b>LOJA:</b> /loja, /comprar [item], /usar [item], /vender [item]");
+                print("<b>LUTAR:</b> /atacar [alvo], /q [alvo], /w, /e, /r [alvo]");
+                print("<b>LOJA:</b> /loja, /comprar [item], /usar [item], /vender,/coletar");
                 print("<b>INFO:</b> /status, /stats [alvo], /limpar");
                 break;
             
@@ -110,6 +110,34 @@ input.addEventListener('keypress', async e => {
                 }
                 else print("Alvo não está aqui.");
                 break;
+                // Dentro do switch(cmd) no comandos.js
+
+    case '/coletar':
+        Entidades.coletarNaJungle(player, print);
+        save();
+        break;
+
+    case '/vender':
+        if (player.location !== "BaseAliada") {
+            return print("Você só pode vender seus materiais na <b>Base Aliada</b>!");
+        }
+
+        if (!player.materiais || player.materiais.length === 0) {
+            return print("Você não possui materiais para vender.");
+        }
+
+        let totalOuro = 0;
+        player.materiais.forEach(m => {
+            if (m === "FragmentoComum") totalOuro += 50;
+            if (m === "FragmentoRaro") totalOuro += 150;
+            if (m === "FragmentoLendario") totalOuro += 600;
+        });
+
+        print(`💰 Negócio fechado! Você vendeu ${player.materiais.length} itens por <b>${totalOuro} ouro</b>.`);
+        player.gold += totalOuro;
+        player.materiais = []; // Limpa o "saco de materiais"
+        save();
+        break;
 
             case '/q': case '/w': case '/e':
                 const skillKey = cmd.replace('/', '');
@@ -133,33 +161,7 @@ input.addEventListener('keypress', async e => {
                 if (ultRes.success) save();
                 print(ultRes.msg);
                 break;
-            case '/farmar':
-    // Mudamos para iniciarCombate que é o nome da função no novo entidades.js
-    Entidades.iniciarCombate(player, save, print);
-    break;
-// Exemplo de integração no seu sistema de comandos:
-
-// Adicione um comando de fuga
-case '/fugir':
-    if (player.inCombat) {
-        // Tentativa de fuga usando a lógica de probabilidade
-        if (Math.random() > 0.5) {
-            // Chama a função correta do arquivo entidades.js para parar o loop
-            Entidades.pararCombate(player);
-            print("<b style='color:#2ecc71'>🏃 Você conseguiu fugir com sucesso!</b>");
             
-            // Penalidade: O monstro ataca a estrutura local já que você saiu
-            Entidades.entidadeAtacaEstrutura(player.location, 50, print);
-        } else {
-            print("<b style='color:#e74c3c'>🚫 Falha ao fugir! O inimigo te acertou pelas costas.</b>");
-            player.hp -= 30; // Dano fixo por falha na fuga
-            if (player.hp < 0) player.hp = 0;
-        }
-        save(); // Sincroniza o estado do player no Firebase
-    } else {
-        print("Não há do que fugir no momento.");
-    }
-    break;
             case '/loja':
                 print("============== 🛒 MERCADO ==============");
 
@@ -323,11 +325,12 @@ function save() {
 // Loop de Regeneração e Renda
 setInterval(() => {
     if (player && playerName) {
-        player.gold += 5;
+        player.gold += 1;
         player.mana = Math.min(player.mana + 4, player.mana_max);
+        Entidades.verificarDefesa(player, print);
         save();
     }
-}, 4000);
+}, 2000);
 
 // Este código roda sozinho sempre que alguém envia algo
 chatRef.limitToLast(10).on('child_added', (snapshot) => {
