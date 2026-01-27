@@ -50,9 +50,9 @@ input.addEventListener('keypress', async e => {
         // --- DICIONÁRIO COMPLETO DE COMANDOS ---
         switch (cmd) {
             case '/ajuda':
-                print("<b>MAPA:</b> /ir [local], /locais, /ver, /objetivos");
+                print("<b>MAPA:</b> /ir [local], /locais, /ver, /objetivos,/coletar");
                 print("<b>LUTAR:</b> /atacar [alvo], /q [alvo], /w, /e, /r [alvo]");
-                print("<b>LOJA:</b> /loja, /comprar [item], /usar [item], /vender,/coletar");
+                print("<b>LOJA:</b> /loja, /comprar [item], /usar [item], /vender");
                 print("<b>INFO:</b> /status, /stats [alvo], /limpar");
                 break;
             
@@ -131,6 +131,38 @@ input.addEventListener('keypress', async e => {
             if (m === "FragmentoComum") totalOuro += 50;
             if (m === "FragmentoRaro") totalOuro += 150;
             if (m === "FragmentoLendario") totalOuro += 600;
+            // Comuns
+if (m === "PedraFerrosa") totalOuro += 30;
+if (m === "FragmentoCobre") totalOuro += 40;
+if (m === "FragmentoComum") totalOuro += 50; // Original
+if (m === "SilicaBrilhante") totalOuro += 60;
+if (m === "CarvaoVital") totalOuro += 70;
+
+// Incomuns
+if (m === "LingotePrata") totalOuro += 100;
+if (m === "AcoNegro") totalOuro += 115;
+if (m === "QuartzoRosa") totalOuro += 130;
+if (m === "PiritaDourada") totalOuro += 140;
+
+// Raros
+if (m === "FragmentoRaro") totalOuro += 150; // Original
+if (m === "ObsidianaFria") totalOuro += 180;
+if (m === "CobaltoCeleste") totalOuro += 220;
+if (m === "AdamantiteBruto") totalOuro += 260;
+if (m === "MithrilPuro") totalOuro += 300;
+
+// Épicos
+if (m === "Orichalcum") totalOuro += 400;
+if (m === "CristalVazio") totalOuro += 450;
+if (m === "PedraSolfar") totalOuro += 500;
+if (m === "EletroAzul") totalOuro += 550;
+
+// Lendários
+if (m === "FragmentoLendario") totalOuro += 600; // Original
+if (m === "LuzEterna") totalOuro += 800;
+if (m === "MateriaEscura") totalOuro += 1200;
+if (m === "SangueDragao") totalOuro += 2500;
+if (m === "Divindade") totalOuro += 10000;
         });
 
         print(`💰 Negócio fechado! Você vendeu ${player.materiais.length} itens por <b>${totalOuro} ouro</b>.`);
