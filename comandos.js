@@ -332,46 +332,33 @@ if (m === "Divindade") totalOuro += 10000;
                 
                 print("<br><i>Comando: /comprar [NomeDoItem]</i>");
                 break;
-            case '/comprar':
-    const itemNome = args[1]; // Ex: AtaqueFisico+1 ou EscudoFisico
+            
+case '/comprar':
+    const itemNome = args[1];
     if (!itemNome) return print("Use: /comprar [NomeDoItem]");
 
-    // canBuyItem retorna { can: bool, price: int, consume: array, reason: string }
-    const buy = canBuyItem(player, itemNome); 
-    
-    if (buy.can) {
-        // Verifica limite de inventário (6 espaços)
-        if (player.inventory.length >= 6 && !buy.consume.length) {
-            return print("❌ Inventário cheio!");
-        }
+    // Busca o preço fixo no ITEM_PRICES definido no itens.js
+    const preco = ITEM_PRICES[itemNome];
 
-        player.gold -= buy.price;
-
-        // 1. Remove os ingredientes do inventário
-        if (buy.consume && buy.consume.length > 0) {
-            buy.consume.forEach(cItem => {
-                const idx = player.inventory.indexOf(cItem);
-                if (idx > -1) player.inventory.splice(idx, 1);
-            });
-        }
-
-        // 2. Aplica o efeito e salva no inventário
-        // Se for item de atributo (Mini Item), aplicamos direto
-        if (itemNome.includes('+')) {
-            applyItemEffect(player, itemNome);
-            print(`✅ Atributo expandido: <b>${itemNome}</b> por ${buy.price}g!`);
-        } else {
-            // Se for item completo/consumível, vai para o inventário
-            player.inventory.push(itemNome);
-            print(`✅ Você comprou: <b>${itemNome}</b> por ${buy.price}g!`);
-        }
-
-        save(); 
-    } else {
-        print(`❌ ${buy.reason}`);
+    if (!preco) {
+        return print("❌ Esse item não existe na loja.");
     }
-    break;
 
+    if (player.gold < preco) {
+        return print(`❌ Ouro insuficiente! Você precisa de ${preco}g.`);
+    }
+
+    if (player.inventory.length >= 6) {
+        return print("❌ Inventário cheio! Use ou venda algo primeiro.");
+    }
+
+    // Lógica simplificada: paga e recebe
+    player.gold -= preco;
+    player.inventory.push(itemNome);
+    print(`✅ Você comprou <b>${itemNome}</b>! Digite <u>/usar ${itemNome}</u> para ativar.`);
+
+    save();
+    break;
 
             case '/usar':
                 const uItem = args[1];
