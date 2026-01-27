@@ -1,27 +1,29 @@
-// entidades.js - Sistema de Combate Refatorado
+// entidades.js - Sistema de Combate Evoluído e IA de Estruturas
 const RESPAWN_MONSTROS = {};
 let combatInterval = null;
 
 const Entidades = {
+    // --- BANCO DE DADOS DE ENTIDADES ---
     NPCS: {
-        "minion": { nome: "Tropa de Infantaria", hp_max: 150, hp: 150, dano: 15, gold: 25, xp: 20, respawn: 30000 },
-        "super_minion": { nome: "Tropa de Cerco", hp_max: 400, hp: 400, dano: 40, gold: 60, xp: 50, respawn: 45000 },
-        "monstro_jungle": { nome: "Criatura da Selva", hp_max: 500, hp: 500, dano: 35, gold: 90, xp: 80, respawn: 60000 },
-        "boss_rio": { nome: "Sentimonstro Gigante", hp_max: 3500, hp: 3500, dano: 90, gold: 600, xp: 500, respawn: 180000 },
-        "torre": { nome: "Torre Defensiva", hp_max: 2500, hp: 2500, dano: 120, gold: 300, xp: 200, respawn: 300000 },
-        "nucleo": { nome: "Núcleo Principal", hp_max: 5000, hp: 5000, dano: 200, gold: 1000, xp: 1000, respawn: 0 }
+        "minion": { nome: "Tropa de Infantaria", hp_max: 150, dano: 18, gold: 25, xp: 20, respawn: 30000, esquiva: 0.05 },
+        "super_minion": { nome: "Tropa de Cerco", hp_max: 450, dano: 45, gold: 65, xp: 55, respawn: 45000, esquiva: 0.02 },
+        "monstro_jungle": { nome: "Criatura da Selva", hp_max: 550, dano: 40, gold: 95, xp: 85, respawn: 60000, esquiva: 0.08 },
+        "boss_rio": { nome: "Sentimonstro Gigante", hp_max: 4000, dano: 110, gold: 700, xp: 600, respawn: 300000, esquiva: 0.10 },
+        "torre": { nome: "Torre Defensiva", hp_max: 3000, dano: 150, gold: 400, xp: 300, respawn: 0, esquiva: 0 },
+        "nucleo": { nome: "Núcleo Principal", hp_max: 6000, dano: 250, gold: 1500, xp: 1000, respawn: 0, esquiva: 0 }
     },
 
+    // --- GERADORES ---
     gerarMonstroJungle: function() {
-        const monstros = [
-            { nome: "Lobo das Trevas", hp_m: 300, atk: 25, g: 70 },
-            { nome: "Golem de Pedra", hp_m: 700, atk: 15, g: 130 },
-            { nome: "Aranha Gigante", hp_m: 280, atk: 55, g: 140 }
+        const tipos = [
+            { nome: "Lobo das Trevas", hp_m: 350, atk: 30, g: 75, e: 0.15 },
+            { nome: "Golem de Pedra", hp_m: 800, atk: 20, g: 140, e: 0.02 },
+            { nome: "Aranha Tecelã", hp_m: 320, atk: 60, g: 150, e: 0.20 }
         ];
-        const s = monstros[Math.floor(Math.random() * monstros.length)];
+        const s = tipos[Math.floor(Math.random() * tipos.length)];
         return { 
-            nome: s.nome, hp_max: s.hp_m, hp: s.hp_m, 
-            dano: s.atk, gold: s.g, xp: Math.floor(s.g * 0.8), respawn: 60000 
+            nome: s.nome, hp_max: s.hp_m, hp: s.hp_m, dano: s.atk, 
+            gold: s.g, xp: Math.floor(s.g * 0.9), respawn: 60000, esquiva: s.e 
         };
     },
 
@@ -30,93 +32,108 @@ const Entidades = {
         if (local === "Rio") return { ...this.NPCS.boss_rio, hp: this.NPCS.boss_rio.hp_max }; 
         if (local === "BaseInimiga") return { ...this.NPCS.nucleo, hp: this.NPCS.nucleo.hp_max };
 
-        if (local.includes("T") && !local.includes(heroType)) {
-            return local.includes("T3") ? { ...this.NPCS.super_minion } : { ...this.NPCS.minion };
+        // Lógica de Torres/Minions Inimigos
+        const isEnemyTerritory = (local.includes("T") && !local.includes(heroType));
+        if (isEnemyTerritory) {
+            const template = local.includes("T3") ? this.NPCS.super_minion : this.NPCS.minion;
+            return { ...template, hp: template.hp_max };
         }
         return null;
     },
 
-    // --- NOVO: MÉTODO DE ATAQUE MANUAL ---
-    atacarManualmente: function(player, saveFunc, printFunc) {
-        if (!player.inCombat || !player.currentMob) {
-            return printFunc("Você não está em combate com ninguém!");
-        }
-        
-        printFunc("<b>[Ação Manual]</b> Você avança para um golpe extra!");
-        this.processarTurno(player, player.currentMob, saveFunc, printFunc);
+    // --- UTILITÁRIOS VISUAIS ---
+    gerarBarraVida: function(atual, max) {
+        const percent = Math.max(0, Math.min(100, (atual / max) * 100));
+        const blocos = Math.floor(percent / 10);
+        let barra = "▰".repeat(blocos) + "▱".repeat(10 - blocos);
+        let cor = percent > 50 ? "#2ecc71" : percent > 20 ? "#f1c40f" : "#e74c3c";
+        return `<span style="color:${cor}; font-family: monospace;">[${barra}] ${Math.ceil(percent)}%</span>`;
     },
 
-    // --- LÓGICA CENTRALIZADA DE TURNO ---
-    processarTurno: function(player, mob, saveFunc, printFunc) {
-        let log = "";
-        
-        // 1. Cálculo de Dano do Jogador
-        let danoBase = Math.max(player.ataque_fisico, player.ataque_magico);
-        let variacao = 0.9 + Math.random() * 0.2; // 90% a 110%
-        let danoPlayer = danoBase * variacao;
-        
-        if (Math.random() < 0.1) { // 10% chance crítico
-            danoPlayer *= 1.5;
-            log += "⚡<b>CRÍTICO!</b> ";
-        }
-
-        mob.hp -= danoPlayer;
-        log += `Você causou <b>${danoPlayer.toFixed(0)}</b> de dano. `;
-
-        // Vampirismo
-        if (player.effects.includes('vampirismo')) {
-            let cura = danoPlayer * 0.15;
-            player.hp = Math.min(player.hp + cura, player.hp_max);
-            log += `<span style="color:lime">(+${cura.toFixed(0)} HP)</span> `;
-        }
-
-        // Verifica morte do Mob
-        if (mob.hp <= 0) {
-            printFunc(log);
-            this.finalizarCombate(player, mob, true, saveFunc, printFunc);
-            return;
-        }
-
-        // 2. Contra-ataque do Mob
-        let reducao = (player.def_fisica + player.def_magica) * 0.3;
-        let danoRecebido = Math.max(5, mob.dano - reducao);
-        
-        player.hp -= danoRecebido;
-        log += `<br>Inimigo revidou: <span style="color:red">-${danoRecebido.toFixed(0)} HP</span>. (HP: ${mob.hp.toFixed(0)})`;
-
-        printFunc(log);
-        saveFunc();
-
-        // Verifica morte do Player
-        if (player.hp <= 0) {
-            printFunc(`<b style="color:red">VOCÊ FOI DERROTADO!</b>`);
-            this.finalizarCombate(player, mob, false, saveFunc, printFunc);
-            this.entidadeAtacaEstrutura(player.location, mob.dano, printFunc);
-        }
-    },
-
+    // --- SISTEMA DE COMBATE MELHORADO ---
     iniciarCombate: function(player, saveFunc, printFunc) {
         if (player.inCombat) return;
 
-        // Checar Respawn
-        if (RESPAWN_MONSTROS[player.location] && Date.now() < RESPAWN_MONSTROS[player.location]) {
-            const espera = Math.ceil((RESPAWN_MONSTROS[player.location] - Date.now()) / 1000);
-            return printFunc(`Local vazio. Respawn em ${espera}s.`);
+        const loc = player.location;
+        if (RESPAWN_MONSTROS[loc] && Date.now() < RESPAWN_MONSTROS[loc]) {
+            const espera = Math.ceil((RESPAWN_MONSTROS[loc] - Date.now()) / 1000);
+            return printFunc(`⏳ Área em recuperação. Respawn em ${espera}s.`);
         }
 
-        let mob = this.obterInimigoLocal(player.location, player.heroType);
-        if (!mob) return printFunc("Nada para lutar aqui.");
+        let mob = this.obterInimigoLocal(loc, player.heroType);
+        if (!mob) return printFunc("🍃 A área parece segura por enquanto.");
 
+        // Configuração
         player.inCombat = true;
-        player.currentMob = mob; // Armazena o mob no player para acesso manual
+        let turnos = 0;
+        
+        printFunc(`---`);
+        printFunc(`⚔️ <b>COMBATE INICIADO:</b> <span style="color:#e74c3c">${mob.nome}</span>`);
+        printFunc(this.gerarBarraVida(mob.hp, mob.hp_max));
 
-        printFunc(`<br>⚔️ <b>COMBATE INICIADO:</b> ${mob.nome}`);
-        printFunc(`<i>Dica: Use /atacar para golpear mais rápido!</i>`);
-
-        // Loop Automático (Auto-Attack)
         combatInterval = setInterval(() => {
-            this.processarTurno(player, mob, saveFunc, printFunc);
-        }, 3000); // Aumentei para 3s para dar tempo do jogador atacar manualmente
+            turnos++;
+            let log = `<b>T${turnos}</b> | `;
+            
+            // 1. TURNO DO JOGADOR
+            const chanceEsquivaMob = Math.random() < (mob.esquiva || 0);
+            if (chanceEsquivaMob) {
+                log += `💨 ${mob.nome} <b>esquivou</b>! `;
+            } else {
+                let danoP = Math.max(player.ataque_fisico, player.ataque_magico);
+                let isCrit = Math.random() < 0.15; // 15% Crit chance
+                if (isCrit) { danoP *= 1.8; log += `💥 `; }
+
+                danoP = Math.floor(danoP * (0.9 + Math.random() * 0.2));
+                mob.hp -= danoP;
+                log += `🗡️ <b>${danoP}</b> `;
+
+                // Vampirismo
+                if (player.effects.includes('vampirismo')) {
+                    let cura = Math.floor(danoP * 0.2);
+                    player.hp = Math.min(player.hp + cura, player.hp_max);
+                }
+            }
+
+            // Checar Morte do Mob
+            if (mob.hp <= 0) {
+                this.finalizarCombate(player, mob, true, saveFunc, printFunc);
+                return;
+            }
+
+            // 2. TURNO DO MONSTRO
+            const chanceEsquivaPlayer = Math.random() < (player.agilidade / 100 || 0.05);
+            if (chanceEsquivaPlayer) {
+                log += `| 🛡️ Você desviou!`;
+            } else {
+                let reducao = (player.def_fisica + player.def_magica) * 0.25;
+                let danoM = Math.max(5, Math.floor(mob.dano - reducao));
+                player.hp -= danoM;
+                log += `| 🩸 <span style="color:#ff7675">-${danoM}</span>`;
+            }
+
+            // Atualização de Interface
+            printFunc(`${log}<br>${this.gerarBarraVida(mob.hp, mob.hp_max)}`);
+            saveFunc();
+
+            // Checar Morte do Jogador
+            if (player.hp <= 0) {
+                this.finalizarCombate(player, mob, false, saveFunc, printFunc);
+                this.entidadeAtacaEstrutura(loc, mob, printFunc);
+            }
+        }, 1800); // Turnos ligeiramente mais rápidos
+    },
+
+    tentarFugir: function(player, printFunc) {
+        if (!player.inCombat) return printFunc("Você não está em combate.");
+        
+        // 50% de chance de fuga
+        if (Math.random() > 0.5) {
+            printFunc("🏃 <b>Você conseguiu escapar!</b>");
+            this.pararCombate(player);
+        } else {
+            printFunc("🚫 <b>Fuga falhou!</b> O inimigo bloqueou sua saída.");
+        }
     },
 
     pararCombate: function(player) {
@@ -125,23 +142,37 @@ const Entidades = {
             combatInterval = null;
         }
         player.inCombat = false;
-        player.currentMob = null;
     },
 
     finalizarCombate: function(player, mob, vitoria, saveFunc, printFunc) {
         this.pararCombate(player);
+        
         if (vitoria) {
-            printFunc(`<br>🏆 <b>VITÓRIA!</b> +${mob.gold} Gold | +${mob.xp} XP`);
+            printFunc(`---`);
+            printFunc(`🏆 <b>VITÓRIA!</b> ${mob.nome} foi abatido.`);
+            printFunc(`💰 <b>+${mob.gold}</b> gold | ✨ <b>+${mob.xp}</b> XP`);
+            
             player.gold += mob.gold;
             player.xp += mob.xp;
-            if (mob.respawn > 0) RESPAWN_MONSTROS[player.location] = Date.now() + mob.respawn;
+            
+            if (mob.respawn > 0) {
+                RESPAWN_MONSTROS[player.location] = Date.now() + mob.respawn;
+            }
+        } else {
+            printFunc(`☠️ <b>DERROTA!</b> Você foi nocauteado por ${mob.nome}.`);
+            player.hp = 0; // Garante que o sistema de morte seja ativado
         }
         saveFunc();
     },
 
-    entidadeAtacaEstrutura: function(local, danoMob, printFunc) {
+    entidadeAtacaEstrutura: function(local, mob, printFunc) {
         if (local.includes("Base") || local.includes("T")) {
-            printFunc(`<span style="color:orange">⚠️ A estrutura em ${local} está sob ataque! (-${danoMob} HP)</span>`);
+            setTimeout(() => {
+                printFunc(`---`);
+                printFunc(`⚠️ <b>ESTRUTURA SOB ATAQUE!</b>`);
+                printFunc(`O <span style="color:red">${mob.nome}</span> está destruindo as defesas em ${local}!`);
+                printFunc(`Dano causado: <b>${mob.dano * 2}</b>`);
+            }, 1000);
         }
     }
 };
