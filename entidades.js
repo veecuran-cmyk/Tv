@@ -1,30 +1,37 @@
-// entidades.js - Sistema de Combate Evoluído e IA de Estruturas
-const RESPAWN_MONSTROS = {};
-let combatInterval = null;
+// entidades.js - Sistema de Combate Persistente e IA de Estruturas
+const RESPAWN_MONSTROS = {}; 
+let combatInterval = null; 
 
 const Entidades = {
-    // --- BANCO DE DADOS DE ENTIDADES ---
+    // --- BANCO DE DADOS (12 Entidades) ---
     NPCS: {
-        "minion": { nome: "Tropa de Infantaria", hp_max: 150, dano: 18, gold: 25, xp: 20, respawn: 30000, esquiva: 0.05 },
-        "super_minion": { nome: "Tropa de Cerco", hp_max: 450, dano: 45, gold: 65, xp: 55, respawn: 45000, esquiva: 0.02 },
-        "monstro_jungle": { nome: "Criatura da Selva", hp_max: 550, dano: 40, gold: 95, xp: 85, respawn: 60000, esquiva: 0.08 },
-        "boss_rio": { nome: "Sentimonstro Gigante", hp_max: 4000, dano: 110, gold: 700, xp: 600, respawn: 300000, esquiva: 0.10 },
-        "torre": { nome: "Torre Defensiva", hp_max: 3000, dano: 150, gold: 400, xp: 300, respawn: 0, esquiva: 0 },
-        "nucleo": { nome: "Núcleo Principal", hp_max: 6000, dano: 250, gold: 1500, xp: 1000, respawn: 0, esquiva: 0 }
+        // Tropas de Linha (Minions)
+        "minion_infantaria": { nome: "Infantaria de Linha", hp_max: 150, dano: 18, gold: 20, xp: 15, respawn: 30000, esquiva: 0.05 },
+        "minion_arqueiro": { nome: "Arqueiro Sombrio", hp_max: 120, dano: 25, gold: 22, xp: 18, respawn: 30000, esquiva: 0.12 },
+        "super_minion": { nome: "Tropa de Cerco (Tanque)", hp_max: 500, dano: 45, gold: 70, xp: 60, respawn: 45000, esquiva: 0.02 },
+        
+        // Monstros da Selva (Jungle)
+        "lobo": { nome: "Lobo das Trevas", hp_max: 300, dano: 35, gold: 80, xp: 70, respawn: 60000, esquiva: 0.15 },
+        "golem": { nome: "Golem de Pedra", hp_max: 850, dano: 25, gold: 130, xp: 110, respawn: 60000, esquiva: 0.00 },
+        "aranha": { nome: "Tecelã da Noite", hp_max: 280, dano: 55, gold: 140, xp: 120, respawn: 60000, esquiva: 0.20 },
+        "dragao": { nome: "Dragão Elemental", hp_max: 2500, dano: 80, gold: 400, xp: 350, respawn: 180000, esquiva: 0.05 },
+        "herald": { nome: "Arauto do Abismo", hp_max: 1800, dano: 70, gold: 300, xp: 280, respawn: 150000, esquiva: 0.05 },
+
+        // Épicos e Chefes
+        "boss_rio": { nome: "Sentimonstro do Rio", hp_max: 4500, dano: 120, gold: 800, xp: 700, respawn: 300000, esquiva: 0.08 },
+        "titã": { nome: "Titã Esquecido", hp_max: 8000, dano: 180, gold: 2000, xp: 1500, respawn: 600000, esquiva: 0.02 },
+
+        // Estruturas
+        "torre": { nome: "Torre Defensiva", hp_max: 3000, dano: 160, gold: 500, xp: 400, respawn: 0, esquiva: 0 },
+        "nucleo": { nome: "Núcleo Ancestral", hp_max: 7000, dano: 280, gold: 0, xp: 2000, respawn: 0, esquiva: 0 }
     },
 
-    // --- GERADORES ---
+    // --- LÓGICA DE GERAÇÃO ---
     gerarMonstroJungle: function() {
-        const tipos = [
-            { nome: "Lobo das Trevas", hp_m: 350, atk: 30, g: 75, e: 0.15 },
-            { nome: "Golem de Pedra", hp_m: 800, atk: 20, g: 140, e: 0.02 },
-            { nome: "Aranha Tecelã", hp_m: 320, atk: 60, g: 150, e: 0.20 }
-        ];
-        const s = tipos[Math.floor(Math.random() * tipos.length)];
-        return { 
-            nome: s.nome, hp_max: s.hp_m, hp: s.hp_m, dano: s.atk, 
-            gold: s.g, xp: Math.floor(s.g * 0.9), respawn: 60000, esquiva: s.e 
-        };
+        const monstros = ["lobo", "golem", "aranha", "dragao", "herald"];
+        const sorteio = monstros[Math.floor(Math.random() * monstros.length)];
+        const ref = this.NPCS[sorteio];
+        return { ...ref, hp: ref.hp_max };
     },
 
     obterInimigoLocal: function(local, heroType) {
@@ -32,108 +39,92 @@ const Entidades = {
         if (local === "Rio") return { ...this.NPCS.boss_rio, hp: this.NPCS.boss_rio.hp_max }; 
         if (local === "BaseInimiga") return { ...this.NPCS.nucleo, hp: this.NPCS.nucleo.hp_max };
 
-        // Lógica de Torres/Minions Inimigos
-        const isEnemyTerritory = (local.includes("T") && !local.includes(heroType));
-        if (isEnemyTerritory) {
-            const template = local.includes("T3") ? this.NPCS.super_minion : this.NPCS.minion;
-            return { ...template, hp: template.hp_max };
+        // Defesa de território (Torres e Minions)
+        if (local.includes("T") && !local.includes(heroType)) {
+            const ent = local.includes("T3") ? this.NPCS.super_minion : this.NPCS.minion_infantaria;
+            return { ...ent, hp: ent.hp_max };
         }
         return null;
     },
 
-    // --- UTILITÁRIOS VISUAIS ---
+    // --- INTERFACE VISUAL ---
     gerarBarraVida: function(atual, max) {
         const percent = Math.max(0, Math.min(100, (atual / max) * 100));
-        const blocos = Math.floor(percent / 10);
-        let barra = "▰".repeat(blocos) + "▱".repeat(10 - blocos);
-        let cor = percent > 50 ? "#2ecc71" : percent > 20 ? "#f1c40f" : "#e74c3c";
+        const totalBlocos = 10;
+        const preenchidos = Math.floor(percent / 10);
+        const barra = "▰".repeat(preenchidos) + "▱".repeat(totalBlocos - preenchidos);
+        const cor = percent > 50 ? "#2ecc71" : percent > 20 ? "#f1c40f" : "#e74c3c";
         return `<span style="color:${cor}; font-family: monospace;">[${barra}] ${Math.ceil(percent)}%</span>`;
     },
 
-    // --- SISTEMA DE COMBATE MELHORADO ---
+    // --- SISTEMA DE COMBATE AUTOMÁTICO ---
     iniciarCombate: function(player, saveFunc, printFunc) {
-        if (player.inCombat) return;
+        if (player.inCombat) return printFunc("⚠️ Você já está em combate! Aguarde o desfecho.");
 
         const loc = player.location;
         if (RESPAWN_MONSTROS[loc] && Date.now() < RESPAWN_MONSTROS[loc]) {
-            const espera = Math.ceil((RESPAWN_MONSTROS[loc] - Date.now()) / 1000);
-            return printFunc(`⏳ Área em recuperação. Respawn em ${espera}s.`);
+            const resto = Math.ceil((RESPAWN_MONSTROS[loc] - Date.now()) / 1000);
+            return printFunc(`⏳ A área está vazia. Respawn em ${resto}s.`);
         }
 
         let mob = this.obterInimigoLocal(loc, player.heroType);
-        if (!mob) return printFunc("🍃 A área parece segura por enquanto.");
+        if (!mob) return printFunc("🍃 tudo tranquilo");
 
-        // Configuração
+        // Trava de estado
         player.inCombat = true;
-        let turnos = 0;
-        
+        let turno = 0;
+
         printFunc(`---`);
-        printFunc(`⚔️ <b>COMBATE INICIADO:</b> <span style="color:#e74c3c">${mob.nome}</span>`);
+        printFunc(`⚔️ <b>FARM INICIADO:</b> <span style="color:#e74c3c">${mob.nome}</span>`);
+        printFunc(`<i>O combate é automático. Por favor, aguarde...</i>`);
         printFunc(this.gerarBarraVida(mob.hp, mob.hp_max));
 
         combatInterval = setInterval(() => {
-            turnos++;
-            let log = `<b>T${turnos}</b> | `;
-            
-            // 1. TURNO DO JOGADOR
-            const chanceEsquivaMob = Math.random() < (mob.esquiva || 0);
-            if (chanceEsquivaMob) {
-                log += `💨 ${mob.nome} <b>esquivou</b>! `;
+            turno++;
+            let log = `<b>T${turno}</b> | `;
+
+            // 1. ATAQUE DO JOGADOR
+            const errouP = Math.random() < mob.esquiva;
+            if (errouP) {
+                log += `💨 Errou! `;
             } else {
                 let danoP = Math.max(player.ataque_fisico, player.ataque_magico);
-                let isCrit = Math.random() < 0.15; // 15% Crit chance
-                if (isCrit) { danoP *= 1.8; log += `💥 `; }
-
+                if (Math.random() < 0.15) { danoP *= 1.7; log += `💥 `; } // Crítico
                 danoP = Math.floor(danoP * (0.9 + Math.random() * 0.2));
+                
                 mob.hp -= danoP;
-                log += `🗡️ <b>${danoP}</b> `;
+                log += `🗡️ ${danoP} `;
 
-                // Vampirismo
                 if (player.effects.includes('vampirismo')) {
-                    let cura = Math.floor(danoP * 0.2);
-                    player.hp = Math.min(player.hp + cura, player.hp_max);
+                    player.hp = Math.min(player.hp_max, player.hp + (danoP * 0.15));
                 }
             }
 
-            // Checar Morte do Mob
             if (mob.hp <= 0) {
                 this.finalizarCombate(player, mob, true, saveFunc, printFunc);
                 return;
             }
 
-            // 2. TURNO DO MONSTRO
-            const chanceEsquivaPlayer = Math.random() < (player.agilidade / 100 || 0.05);
-            if (chanceEsquivaPlayer) {
-                log += `| 🛡️ Você desviou!`;
+            // 2. ATAQUE DO INIMIGO
+            const esquivaPlayer = (player.agilidade || 5) / 100;
+            if (Math.random() < esquivaPlayer) {
+                log += `| 🛡️ Desviou!`;
             } else {
-                let reducao = (player.def_fisica + player.def_magica) * 0.25;
+                let reducao = (player.def_fisica + player.def_magica) * 0.2;
                 let danoM = Math.max(5, Math.floor(mob.dano - reducao));
                 player.hp -= danoM;
                 log += `| 🩸 <span style="color:#ff7675">-${danoM}</span>`;
             }
 
-            // Atualização de Interface
             printFunc(`${log}<br>${this.gerarBarraVida(mob.hp, mob.hp_max)}`);
             saveFunc();
 
-            // Checar Morte do Jogador
             if (player.hp <= 0) {
                 this.finalizarCombate(player, mob, false, saveFunc, printFunc);
                 this.entidadeAtacaEstrutura(loc, mob, printFunc);
             }
-        }, 1800); // Turnos ligeiramente mais rápidos
-    },
 
-    tentarFugir: function(player, printFunc) {
-        if (!player.inCombat) return printFunc("Você não está em combate.");
-        
-        // 50% de chance de fuga
-        if (Math.random() > 0.5) {
-            printFunc("🏃 <b>Você conseguiu escapar!</b>");
-            this.pararCombate(player);
-        } else {
-            printFunc("🚫 <b>Fuga falhou!</b> O inimigo bloqueou sua saída.");
-        }
+        }, 2000); 
     },
 
     pararCombate: function(player) {
@@ -146,21 +137,17 @@ const Entidades = {
 
     finalizarCombate: function(player, mob, vitoria, saveFunc, printFunc) {
         this.pararCombate(player);
-        
+        printFunc(`---`);
+
         if (vitoria) {
-            printFunc(`---`);
-            printFunc(`🏆 <b>VITÓRIA!</b> ${mob.nome} foi abatido.`);
-            printFunc(`💰 <b>+${mob.gold}</b> gold | ✨ <b>+${mob.xp}</b> XP`);
-            
+            printFunc(`🏆 <b>VITÓRIA!</b> ${mob.nome} derrotado.`);
+            printFunc(`💰 +${mob.gold} Ouro | ✨ +${mob.xp} XP`);
             player.gold += mob.gold;
             player.xp += mob.xp;
-            
-            if (mob.respawn > 0) {
-                RESPAWN_MONSTROS[player.location] = Date.now() + mob.respawn;
-            }
+            if (mob.respawn > 0) RESPAWN_MONSTROS[player.location] = Date.now() + mob.respawn;
         } else {
-            printFunc(`☠️ <b>DERROTA!</b> Você foi nocauteado por ${mob.nome}.`);
-            player.hp = 0; // Garante que o sistema de morte seja ativado
+            printFunc(`💀 <b>DERROTA...</b> Você caiu diante de ${mob.nome}.`);
+            player.hp = 0;
         }
         saveFunc();
     },
@@ -168,10 +155,7 @@ const Entidades = {
     entidadeAtacaEstrutura: function(local, mob, printFunc) {
         if (local.includes("Base") || local.includes("T")) {
             setTimeout(() => {
-                printFunc(`---`);
-                printFunc(`⚠️ <b>ESTRUTURA SOB ATAQUE!</b>`);
-                printFunc(`O <span style="color:red">${mob.nome}</span> está destruindo as defesas em ${local}!`);
-                printFunc(`Dano causado: <b>${mob.dano * 2}</b>`);
+                printFunc(`⚠️ <b>ESTRUTURA INDEFESA!</b> ${mob.nome} está atacando ${local}!`);
             }, 1000);
         }
     }
