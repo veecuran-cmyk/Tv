@@ -79,6 +79,7 @@ input.addEventListener('keypress', async e => {
                 break;
 
             case '/ir':
+                if (player.inCombat) return print("🚫 Você não pode viajar enquanto está em combate!");
                 const dest = args[1];
                 if (MAP_LOCATIONS.includes(dest)) {
                     player.location = dest;
@@ -133,6 +134,7 @@ input.addEventListener('keypress', async e => {
                 print(ultRes.msg);
                 break;
             case '/farmar':
+    // Mudamos para iniciarCombate que é o nome da função no novo entidades.js
     Entidades.iniciarCombate(player, save, print);
     break;
 // Exemplo de integração no seu sistema de comandos:
@@ -140,19 +142,22 @@ input.addEventListener('keypress', async e => {
 // Adicione um comando de fuga
 case '/fugir':
     if (player.inCombat) {
-        // Chance de 50% de fugir
+        // Tentativa de fuga usando a lógica de probabilidade
         if (Math.random() > 0.5) {
+            // Chama a função correta do arquivo entidades.js para parar o loop
             Entidades.pararCombate(player);
-            print("Você fugiu do combate com sucesso!");
-            // Penalidade opcional: Entidade bate na torre
+            print("<b style='color:#2ecc71'>🏃 Você conseguiu fugir com sucesso!</b>");
+            
+            // Penalidade: O monstro ataca a estrutura local já que você saiu
             Entidades.entidadeAtacaEstrutura(player.location, 50, print);
         } else {
-            print("Falha ao fugir! O inimigo te acertou pelas costas.");
-            player.hp -= 30; // Penalidade
+            print("<b style='color:#e74c3c'>🚫 Falha ao fugir! O inimigo te acertou pelas costas.</b>");
+            player.hp -= 30; // Dano fixo por falha na fuga
+            if (player.hp < 0) player.hp = 0;
         }
-        save();
+        save(); // Sincroniza o estado do player no Firebase
     } else {
-        print("Não há do que fugir.");
+        print("Não há do que fugir no momento.");
     }
     break;
             case '/loja':
