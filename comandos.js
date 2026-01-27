@@ -332,30 +332,36 @@ if (m === "Divindade") totalOuro += 10000;
                 
                 print("<br><i>Comando: /comprar [NomeDoItem]</i>");
                 break;
-            case '/comprar':
-    const item = args[1];
-    const buy = canBuyItem(player, item); // Nova função do itens.js
+            
+case '/comprar':
+    const itemNome = args[1];
+    if (!itemNome) return print("Use: /comprar [NomeDoItem]");
+
+    const buy = canBuyItem(player, itemNome); // Chama a lógica do itens.js
+    
     if (buy.can) {
         player.gold -= buy.price;
 
-        // Remove itens consumidos da receita (se houver)
+        // 1. Remove os ingredientes usados da receita
         if (buy.consume && buy.consume.length > 0) {
             buy.consume.forEach(cItem => {
                 const idx = player.inventory.indexOf(cItem);
                 if (idx > -1) player.inventory.splice(idx, 1);
             });
-            print(`Itens usados na criação: ${buy.consume.join(', ')}`);
+            print(`<span style="color:gray">Ingredientes consumidos: ${buy.consume.join(', ')}</span>`);
         }
 
-        player.inventory.push(item);
-        print(`Você adquiriu: <b>${item}</b> por ${buy.price} Ouro!`);
+        // 2. Adiciona o item ao inventário
+        player.inventory.push(itemNome);
+        print(`✅ Você adquiriu: <b>${itemNome}</b> por ${buy.price}g!`);
 
-        // Aplica efeito imediato se for passivo (opcional, dependendo da sua lógica)
-        // applyItemEffect(player, item); 
+        // 3. IMPORTANTE: Aplica o efeito imediatamente se for um item de atributo (Mini Item)
+        // Se você quiser que o item dê status assim que comprar, precisa chamar isso:
+        applyItemEffect(player, itemNome);
 
-        save();
+        save(); // Atualiza o Firebase
     } else {
-        print(buy.reason);
+        print(`❌ ${buy.reason}`);
     }
     break;
 
