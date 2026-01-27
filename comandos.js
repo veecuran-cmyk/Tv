@@ -133,24 +133,82 @@ input.addEventListener('keypress', async e => {
                 print(ultRes.msg);
                 break;
             case '/farmar':
-                // Passamos o player, a função de salvar e a função de print para o outro arquivo
-                Entidades.executarFarm(player, save, print);
-                break;
-            case '/loja':
-                print("<b>ITENS:</b> EscudoFisico, EscudoMagico, CuraPesada, Vampirismo, ImunidadeTemp");
-                print("<b>MINIS:</b> AtaqueFisico+1, AtaqueMagico+1, DefFisica+1");
-                break;
+    Entidades.iniciarCombate(player, save, print);
+    break;
 
-            case '/comprar':
-                const item = args[1];
-                const buy = canBuyItem(player, item);
-                if (buy.can) {
-                    player.gold -= buy.price;
-                    player.inventory.push(item);
-                    print(`Você adquiriu: ${item}`);
-                    save();
-                } else print(buy.reason);
+// Adicione um comando de fuga
+case '/fugir':
+    if (player.inCombat) {
+        // Chance de 50% de fugir
+        if (Math.random() > 0.5) {
+            Entidades.pararCombate(player);
+            print("Você fugiu do combate com sucesso!");
+            // Penalidade opcional: Entidade bate na torre
+            Entidades.entidadeAtacaEstrutura(player.location, 50, print);
+        } else {
+            print("Falha ao fugir! O inimigo te acertou pelas costas.");
+            player.hp -= 30; // Penalidade
+        }
+        save();
+    } else {
+        print("Não há do que fugir.");
+    }
+    break;
+            case '/loja':
+                print("============== 🛒 MERCADO ==============");
+
+                // 1. Exibição dos Itens Menores (Atributos)
+                print("<br><b style='color:#00ffff'>[1] MATERIAIS DE FORJA (Atributos)</b>");
+                print("<i>Aumentam status permanentemente. Use /comprar Nome+Nivel</i>");
+                print("• <b>Preço:</b> Nível 1 (150g) ... até ... Nível 4 (600g)");
+                print("• <b>Disponíveis:</b> AtaqueFisico, AtaqueMagico, DefFisica, DefMagica, VelAtaque");
+
+                // 2. Exibição das Receitas (Itens Completos)
+                print("<br><b style='color:#ffcc00'>[2] ARSENAL AVANÇADO (Receitas)</b>");
+                print("<i>Itens poderosos que exigem ouro + itens menores.</i>");
+                
+                // Itera sobre as receitas definidas no itens.js para mostrar os requisitos
+                if (typeof RECIPES !== 'undefined') {
+                    Object.entries(RECIPES).forEach(([nome, receita]) => {
+                        // Formata a lista de requisitos
+                        let ingredientes = receita.req.length > 0 
+                            ? `<span style='color:#aaa'>Exige: ${receita.req.join(" + ")}</span>` 
+                            : "<span style='color:#00ff41'>[Item Base]</span>";
+                        
+                        print(`🔸 <b>${nome}</b>: ${receita.custo}g | ${ingredientes}`);
+                    });
+                } else {
+                    print("Erro: As receitas não foram carregadas do itens.js");
+                }
+                
+                print("<br><i>Comando: /comprar [NomeDoItem]</i>");
                 break;
+            case '/comprar':
+    const item = args[1];
+    const buy = canBuyItem(player, item); // Nova função do itens.js
+    if (buy.can) {
+        player.gold -= buy.price;
+
+        // Remove itens consumidos da receita (se houver)
+        if (buy.consume && buy.consume.length > 0) {
+            buy.consume.forEach(cItem => {
+                const idx = player.inventory.indexOf(cItem);
+                if (idx > -1) player.inventory.splice(idx, 1);
+            });
+            print(`Itens usados na criação: ${buy.consume.join(', ')}`);
+        }
+
+        player.inventory.push(item);
+        print(`Você adquiriu: <b>${item}</b> por ${buy.price} Ouro!`);
+
+        // Aplica efeito imediato se for passivo (opcional, dependendo da sua lógica)
+        // applyItemEffect(player, item); 
+
+        save();
+    } else {
+        print(buy.reason);
+    }
+    break;
 
             case '/usar':
                 const uItem = args[1];
