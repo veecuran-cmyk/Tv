@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Miraculous: Protocolo Caos</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+      :root {
+    --bg: #0b0b0b;
+    --panel: #161616;
+    --border: #2a2a2a;
+    --primary: #ff4757;
+    --text: #ffffff;
+    --chat-bg: #000000;
+    --msg-me: #2c3e50;
+    --msg-other: #1e1e1e;
+    --safe-bottom: env(safe-area-inset-bottom);
+    --nav-height: 60px; /* Variável para controlar altura do menu */
+}
+
+/* --- Reset & Base --- */
+* {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    outline: none;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    height: 100dvh; /* Fix para mobile browsers */
+    width: 100vw;
+    display: flex;
+    flex-direction: column;
+}
+
+/* --- Layout Principal --- */
+#app {
+    display: grid;
+    height: 100%;
+    width: 100%;
+    grid-template-columns: 280px 1fr 300px;
+    position: relative;
+}
+
+/* --- Sidebars (Painéis Laterais) --- */
+.sidebar {
+    background: var(--panel);
+    padding: 15px;
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.right-sidebar {
+    border-left: 1px solid var(--border);
+    border-right: none;
+}
+
+/* --- Área do Chat --- */
+#chat-area {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--chat-bg);
+    position: relative;
+    min-width: 0;
+}
+
+#messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-bottom: 20px;
+    scroll-behavior: smooth;
+    /* Scrollbar estilizada */
+    scrollbar-width: thin;
+    scrollbar-color: #333 transparent;
+}
+
+/* --- Estilo das Mensagens --- */
+.msg {
+    padding: 10px 15px;
+    border-radius: 18px;
+    max-width: 85%;
+    font-size: 15px;
+    line-height: 1.5;
+    word-wrap: break-word;
+    position: relative;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.msg.me {
+    align-self: flex-end;
+    background: var(--msg-me);
+    border-bottom-right-radius: 2px;
+    color: #fff;
+}
+
+.msg:not(.me) {
+    align-self: flex-start;
+    background: var(--msg-other);
+    border-bottom-left-radius: 2px;
+    border: 1px solid var(--border);
+}
+
+.msg.system {
+    align-self: center;
+    background: rgba(255, 255, 255, 0.05);
+    color: #999;
+    font-size: 12px;
+    border-radius: 5px;
+    border: none;
+    text-align: center;
+    max-width: 95%;
+    margin: 10px 0;
+}
+
+/* --- Área de Input (Digitação) --- */
+#input-area {
+    padding: 10px 15px;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding-bottom: calc(10px + var(--safe-bottom));
+    flex-shrink: 0; /* Impede que o input seja esmagado */
+}
+
+input, select, textarea {
+    padding: 12px 16px;
+    border-radius: 25px;
+    border: 1px solid var(--border);
+    background: #222;
+    color: white;
+    font-size: 16px; /* 16px evita zoom automático no iPhone */
+    transition: border-color 0.2s;
+}
+
+/* Faz o input ocupar o espaço sobrando */
+#input-area input {
+    flex: 1; 
+}
+
+input:focus {
+    border-color: var(--primary);
+}
+
+button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 25px;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--primary);
+    color: white;
+    white-space: nowrap;
+}
+
+button:active {
+    opacity: 0.8;
+}
+
+/* --- Navegação Mobile --- */
+#mobile-nav {
+    display: none; /* Escondido no Desktop */
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    padding: 0;
+    justify-content: space-around;
+    align-items: center;
+    height: calc(var(--nav-height) + var(--safe-bottom));
+    padding-bottom: var(--safe-bottom);
+    
+    /* FIX: Mantém fixo na tela */
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1000;
+}
+
+.nav-btn {
+    background: none;
+    color: #666;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    gap: 4px;
+    flex: 1;
+    height: 100%;
+    border: none;
+}
+
+.nav-btn.active {
+    color: var(--primary);
+}
+
+.nav-btn span {
+    font-size: 10px;
+    text-transform: uppercase;
+    font-weight: 700;
+}
+
+/* --- Componentes Extras --- */
+.progress-wrap {
+    width: 100%;
+    background: #333;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 10px 0;
+}
+
+.progress-bar {
+    height: 100%;
+    background: var(--primary);
+    width: 0%;
+    transition: width 0.3s;
+}
+
+#login {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.login-box {
+    width: 100%;
+    max-width: 350px;
+    text-align: center;
+    padding: 20px;
+}
+
+.login-box input {
+    width: 100%;
+    margin-bottom: 15px;
+}
+
+.status-badge {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    font-weight: 700;
+    background: rgba(255,255,255,0.1);
+    margin-left: auto;
+}
+
+/* --- RESPONSIVIDADE (Mobile Fix) --- */
+@media (max-width: 900px) {
+    #app {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr;
+        height: 100%;
+        /* Importante: Padding embaixo para o conteúdo não ficar atrás do menu */
+        padding-bottom: calc(var(--nav-height) + var(--safe-bottom)); 
+    }
+
+    /* Sidebars: Agora fixas acima do conteúdo, mas abaixo do menu */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        /* Altura total menos o menu inferior */
+        height: calc(100dvh - (var(--nav-height) + var(--safe-bottom))); 
+        z-index: 100;
+        background: var(--bg);
+        transform: translateX(-100%); /* Escondido na esquerda */
+        border-right: none;
+        display: flex; /* Sempre flex, controlado pelo transform */
+    }
+    
+    .right-sidebar {
+        transform: translateX(100%); /* Escondido na direita */
+        border-left: none;
+    }
+
+    .sidebar.active {
+        transform: translateX(0); /* Mostra suavemente */
+    }
+
+    /* Mostra a navegação */
+    #mobile-nav {
+        display: flex;
+    }
+
+    /* Área do Chat */
+    #chat-area {
+        height: 100%; /* Ocupa o grid disponível */
+        width: 100%;
+    }
+    
+    /* Input área ajustada para não colar no menu se for sticky */
+    #input-area {
+        padding-bottom: 10px; 
+    }
+
+    .msg {
+        max-width: 90%;
+    }
+}
+
+    </style>
+</head>
+<body>
+
+    <div id="login">
+        <div class="login-box">
+            <h1 style="font-family:'Courier New'; margin-bottom: 5px; color: var(--primary);">PROTOCOL: CHAOS</h1>
+            <p style="color:#777; font-size:0.9em; margin-bottom:30px;">Miraculous RPG System</p>
+            <input type="text" id="username" placeholder="Nome do Personagem">
+            <br><br>
+            <input type="text" id="room-key" placeholder="Sala (Ex: PARIS)">
+            <br><br>
+            <button class="btn-action" onclick="enterRoom()" style="width:100%; font-size:1.1em;">CONECTAR</button>
+        </div>
+    </div>
+
+    <div id="app">
+        <div class="sidebar" id="tab-info">
+            <h2 style="margin-top:0; color:var(--primary)">Info & Local</h2>
+            <div>
+                <label style="color:#aaa; font-size:0.9em"><i class="fas fa-map-marker-alt"></i> Local Atual</label>
+                <select id="location-select" onchange="updateLocation()" style="margin-top:5px">
+                    <option value="Cidade">🏙️ Cidade</option>
+                    <option value="Escola">🏫 Escola</option>
+                    <option value="Parque">🌳 Parque</option>
+                    <option value="Shopping">🛍️ Shopping</option>
+                    <option value="Cinema">🎬 Cinema</option>
+                    <option value="Torre Eiffel">🗼 Torre Eiffel</option>
+                </select>
+            </div>
+            
+            <div style="flex:1; overflow-y: auto;">
+                <h4 style="border-bottom:1px solid #333; padding-bottom:5px;">Jogadores Online</h4>
+                <div id="user-list"></div>
+            </div>
+
+            <button onclick="abandonMiraculous()" id="btn-abandon" style="background:#444; display:none; margin-top:auto;">
+                <i class="fas fa-mask"></i> Renunciar Poder
+            </button>
+        </div>
+
+        <div id="chat-area">
+            <div id="messages"></div>
+            
+            <div id="spectator-overlay" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); color:white; justify-content:center; align-items:center; pointer-events:none; z-index:10; flex-direction: column; text-align: center;">
+                <i class="fas fa-eye" style="font-size: 3em; margin-bottom: 15px;"></i>
+                <h2>MODO ESPECTADOR</h2>
+                <p>Você está fora do fluxo temporal.</p>
+            </div>
+
+            <div id="input-area">
+                <input type="text" id="msg-input" placeholder="Digite sua mensagem..." autocomplete="off">
+                <button class="btn-action" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+
+        <div class="right-sidebar sidebar" id="tab-hero">
+            <h2 style="margin-top:0;">Ficha</h2>
+            <div id="status-card" style="padding:15px; background:#222; border-radius:8px; border:1px solid #333;">
+                <h2 id="hero-name" style="margin:0; color:#aaa; font-size: 1.5em;">Civil</h2>
+                <div style="display:flex; justify-content:space-between; margin-top:5px; color:#888;">
+                    <small>Nível <span id="lvl-display" style="color:white">1</span></small>
+                    <small>XP: <span id="xp-display" style="color:white">0</span></small>
+                </div>
+                <p id="status-effects" style="font-size:0.8em; color:#e17055; margin-bottom:0;"></p>
+            </div>
+
+            <div id="waiting-area" style="margin-top:20px; text-align:center; color:#555; display:none;">
+                <i class="fas fa-spinner fa-spin"></i><br>
+                <small>O destino está escolhendo...</small>
+            </div>
+
+            <div id="transform-area" style="display:none; margin-top:20px;">
+                <div style="text-align:center; margin-bottom:15px;">
+                    <i class="fas fa-gem" style="font-size:2em; color:gold;"></i>
+                </div>
+                <h4>Miraculous: <span id="kwami-name" style="color:gold"></span></h4>
+                <p style="font-size:0.8em; color:#aaa;">Complete a barra para se transformar.</p>
+                <div class="progress-wrap" id="trans-prog-wrap">
+                    <div class="progress-bar" id="trans-bar"></div>
+                </div>
+                <button class="btn-action" onclick="transform()" id="btn-trans" style="width:100%; font-size:1.1em; text-transform:uppercase;">
+                    Transformar!
+                </button>
+            </div>
+
+            <div id="power-panel" style="display:none;">
+                <h4 id="power-name" style="margin:0; color:var(--primary); text-transform:uppercase;">Poder</h4>
+                <div id="power-controls"></div>
+                <button onclick="usePower()" class="btn-action" style="width:100%; margin-top:5px; background:gold; color:black; font-weight:900;">
+                    ATIVAR
+                </button>
+                <div class="cool-down" id="cd-timer">Pronto</div>
+            </div>
+        </div>
+
+        <div id="mobile-nav">
+            <button class="nav-btn" onclick="switchTab('info')">
+                <i class="fas fa-users"></i><span>Local</span>
+            </button>
+            <button class="nav-btn active" onclick="switchTab('chat')">
+                <i class="fas fa-comment-alt"></i><span>Chat</span>
+            </button>
+            <button class="nav-btn" onclick="switchTab('hero')">
+                <i class="fas fa-mask"></i><span>Herói</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyD9zO9nW9NCDbucBcwwHBej9saZU9Mrw6c",
+            authDomain: "servidor-e2453.firebaseapp.com",
+            databaseURL: "https://servidor-e2453-default-rtdb.firebaseio.com",
+            projectId: "servidor-e2453",
+            storageBucket: "servidor-e2453.firebasestorage.app",
+            messagingSenderId: "888960994601",
+            appId: "1:888960994601:web:0417a852edfcb9f0393b38",
+            measurementId: "G-20JLMYB7VV"
+        };
+
+        if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        
+        const db = firebase.database();
+
+        const HEROES = {
+            ladybug: { name: 'Ladybug', power: 'Talismã', color: '#ff4757', type: 'select', options: ['Purificar (Reset)', 'Criar Item'] },
+            catnoir: { name: 'Cat Noir', power: 'Cataclismo', color: '#2ed573', type: 'slider', max: 100 },
+            queenbee: { name: 'Queen Bee', power: 'Ferroada', color: '#f1c40f', type: 'target' },
+            renarouge: { name: 'Rena Rouge', power: 'Miragem', color: '#e67e22', type: 'illusion_form' },
+            carapace: { name: 'Carapace', power: 'Casco', color: '#2ecc71', type: 'target' },
+            butterfly: { name: 'Hawk Moth', power: 'Akumatizar', color: '#8e44ad', type: 'target_msg' },
+            peacock: { name: 'Mayura', power: 'Sentimonstro', color: '#0984e3', type: 'target' },
+            viperion: { name: 'Viperion', power: 'Segunda Chance', color: '#00b894', type: 'select', options: ['Marcar Tempo', 'Resetar (5min)'] },
+            bunnyx: { name: 'Bunnyx', power: 'Toca do Coelho', color: '#74b9ff', type: 'select', options: ['Parar Tempo', 'Retomar', 'Resetar Total'] },
+            pig: { name: 'Pigella', power: 'Júbilo', color: '#fd79a8', type: 'target' },
+            rooster: { name: 'Rooster Bold', power: 'Sublimação', color: '#e1b12c', type: 'hero_select' },
+            horse: { name: 'Pegasus', power: 'Voyage', color: '#cd84f1', type: 'target_select', options: ['Limbo', 'Refletir'] },
+            ox: { name: 'Minotaurox', power: 'Resistência', color: '#2c3e50', type: 'target' },
+            monkey: { name: 'King Monkey', power: 'Alvoroço', color: '#d63031', type: 'target' },
+            mouse: { name: 'Polymouse', power: 'Multiplicidade', color: '#a29bfe', type: 'target' },
+            dog: { name: 'Miss Hound', power: 'Buscar', color: '#b33939', type: 'target' },
+            goat: { name: 'Caprikid', power: 'Gênese', color: '#dfe6e9', type: 'select', options: ['Espelho', 'Algemas', 'Caderno', 'Borracha', 'Tinta'] },
+            tiger: { name: 'Purple Tigress', power: 'Colisão', color: '#6c5ce7', type: 'slider', max: 100 },
+            dragon: { name: 'Ryuko', power: 'Dragão Elemental', color: '#c0392b', type: 'select', options: ['Água', 'Vento', 'Raio'] }
+        };
+
+        let myId = 'user_' + Math.random().toString(36).substr(2, 9);
+        let roomId = null;
+        let roomRef = null;
+        let myData = { hero: null, transformed: false, xp: 0 };
+
+        function switchTab(tab) {
+            document.querySelectorAll('.sidebar').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById('chat-area').style.display = 'none';
+
+            if (tab === 'chat') {
+                document.getElementById('chat-area').style.display = 'flex';
+                document.querySelectorAll('.nav-btn')[1].classList.add('active');
+            } else if (tab === 'info') {
+                document.getElementById('tab-info').classList.add('active');
+                document.querySelectorAll('.nav-btn')[0].classList.add('active');
+            } else if (tab === 'hero') {
+                document.getElementById('tab-hero').classList.add('active');
+                document.querySelectorAll('.nav-btn')[2].classList.add('active');
+            }
+        }
+
+        function enterRoom() {
+            const user = document.getElementById('username').value.trim();
+            const key = document.getElementById('room-key').value.toUpperCase().trim();
+            
+            if (!user || !key) return alert("Preencha todos os dados!");
+            if (key.includes('.')) return alert("Nome da sala inválido.");
+
+            roomId = key;
+            roomRef = db.ref(`rooms/${roomId}`);
+
+            roomRef.child(`users/${myId}`).set({
+                name: user,
+                role: 'civil',
+                transformed: false,
+                location: 'Cidade',
+                xp: 0,
+                lastPower: 0,
+                status: {
+                    frozen: false,
+                    blind: false,
+                    dreaming: false,
+                    limbo: false,
+                    shield: false,
+                    immune: false,
+                    silenced: false
+                }
+            });
+
+            roomRef.child('pool').once('value', s => {
+                if (!s.exists()) {
+                    roomRef.child('pool').set(Object.keys(HEROES));
+                }
+                setTimeout(tryAutoAssignHero, 1500); 
+            });
+
+            document.getElementById('login').style.display = 'none';
+            
+            const app = document.getElementById('app');
+            app.style.display = (window.innerWidth <= 850) ? 'grid' : 'grid';
+            
+            setupListeners();
+        }
+
+        function tryAutoAssignHero() {
+            roomRef.child('pool').transaction(pool => {
+                if (pool && pool.length > 0) {
+                    const idx = Math.floor(Math.random() * pool.length);
+                    const hero = pool[idx];
+                    pool.splice(idx, 1); 
+                    
+                    roomRef.child(`users/${myId}`).update({ role: hero });
+                    
+                    roomRef.child('messages').push({
+                        sender: 'DESTINO', 
+                        type: 'system', 
+                        text: `🎲 O Miraculous do(a) ${HEROES[hero].name} escolheu ${document.getElementById('username').value}!`
+                    });
+                    
+                    return pool;
+                }
+                return pool;
+            });
+        }
+
+        function setupListeners() {
+            roomRef.child(`users/${myId}`).on('value', snap => {
+                if (!snap.exists()) {
+                    alert("Sua conta foi removida da realidade.");
+                    location.reload();
+                    return;
+                }
+                myData = snap.val();
+                updateUI();
+                handleEffects(myData.status);
+            });
+
+            roomRef.child('messages').limitToLast(50).on('child_added', snap => {
+                renderMessage(snap.key, snap.val());
+            });
+
+            roomRef.child('messages').on('child_removed', snap => {
+                const el = document.getElementById(`msg-${snap.key}`);
+                if (el) el.remove();
+            });
+
+            roomRef.child('users').on('value', snap => {
+                const list = document.getElementById('user-list');
+                list.innerHTML = '';
+                snap.forEach(u => {
+                    const user = u.val();
+                    const isHero = user.role !== 'civil' && user.transformed;
+                    const heroName = isHero ? HEROES[user.role].name : 'Civil';
+                    
+                    let badges = '';
+                   if (user.status?.frozen) badges += '<span class="status-badge badge-frozen">GELADO</span>';
+                    if (user.status?.dreaming) badges += '<span class="status-badge badge-dream">SONHO</span>';
+                    if (user.status?.limbo) badges += '<span class="status-badge badge-limbo">LIMBO</span>';
+
+                    const div = document.createElement('div');
+                    div.className = 'user-item';
+                    div.innerHTML = `
+                        <div>
+                            <strong>${user.name}</strong> <small style="color:${isHero ? HEROES[user.role].color : '#aaa'}">(${heroName})</small>
+                            <br><small><i class="fas fa-map-pin"></i> ${user.location}</small>
+                        </div>
+                        <div>${badges}</div>
+                    `;
+                    list.appendChild(div);
+                });
+            });
+
+            roomRef.child('globals').on('value', snap => {
+                const glob = snap.val() || {};
+                const body = document.body;
+                const input = document.getElementById('msg-input');
+
+                if (glob.timeStopped) {
+                    body.classList.add('frozen-time');
+                    if (myData.role !== 'bunnyx') {
+                        input.disabled = true;
+                        input.placeholder = "⏳ O TEMPO PAROU";
+                    }
+                } else {
+                    body.classList.remove('frozen-time');
+                    if (!myData.status?.silenced && !myData.status?.frozen) {
+                        input.disabled = false;
+                        input.placeholder = "Digite sua mensagem...";
+                    }
+                }
+
+                if (glob.shake) {
+                    body.classList.add('shake');
+                    setTimeout(() => body.classList.remove('shake'), 1000); 
+                }
+                
+                if (glob.waterInvert) {
+                    document.getElementById('messages').classList.add('water-reflect');
+                } else {
+                    document.getElementById('messages').classList.remove('water-reflect');
+                }
+            });
+        }
+
+        function transform() {
+            const btn = document.getElementById('btn-trans');
+            const bar = document.getElementById('trans-bar');
+            const wrap = document.getElementById('trans-prog-wrap');
+            
+            btn.disabled = true;
+            wrap.style.display = 'block';
+            
+            let width = 0;
+            let interval = setInterval(() => {
+                width += 4;
+                bar.style.width = width + '%';
+                if (width >= 100) {
+                    clearInterval(interval);
+                    roomRef.child(`users/${myId}`).update({ transformed: true });
+                    roomRef.child('messages').push({
+                        sender: 'SISTEMA', type: 'system', text: `✨ ${myData.name} diz: TRANSFORMAR!`
+                    });
+                    wrap.style.display = 'none';
+                    btn.disabled = false;
+                }
+            }, 50); 
+        }
+
+        function abandonMiraculous() {
+            if (!confirm("Você perderá seus poderes PERMANENTEMENTE e voltará a ser civil. Continuar?")) return;
+            
+            const currentRole = myData.role;
+            roomRef.child('pool').get().then(snap => {
+                const pool = snap.val() || [];
+                pool.push(currentRole);
+                roomRef.child('pool').set(pool);
+            });
+
+            roomRef.child(`users/${myId}`).update({
+                role: 'civil', transformed: false, xp: 0
+            });
+        }
+
+        function updateUI() {
+            const isHero = myData.role !== 'civil';
+            const transArea = document.getElementById('transform-area');
+            const powerPanel = document.getElementById('power-panel');
+            const abandonBtn = document.getElementById('btn-abandon');
+            const waitingArea = document.getElementById('waiting-area');
+
+            document.getElementById('hero-name').innerText = isHero ? (myData.transformed ? HEROES[myData.role].name : 'Portador') : 'Civil';
+            document.getElementById('hero-name').style.color = isHero ? HEROES[myData.role].color : '#fff';
+            document.getElementById('xp-display').innerText = myData.xp || 0;
+            document.getElementById('lvl-display').innerText = Math.floor((myData.xp || 0) / 10) + 1;
+
+            if (!isHero) {
+                transArea.style.display = 'none';
+                powerPanel.style.display = 'none';
+                abandonBtn.style.display = 'none';
+                waitingArea.style.display = 'block';
+            } else {
+                waitingArea.style.display = 'none';
+                abandonBtn.style.display = 'block';
+                
+                if (!myData.transformed) {
+                    transArea.style.display = 'block';
+                    powerPanel.style.display = 'none';
+                    document.getElementById('kwami-name').innerText = HEROES[myData.role].name;
+                } else {
+                    transArea.style.display = 'none';
+                    powerPanel.style.display = 'flex';
+                    renderPowerControls();
+                }
+            }
+        }
+
+        function renderPowerControls() {
+            const hero = HEROES[myData.role];
+            const div = document.getElementById('power-controls');
+            document.getElementById('power-name').innerText = hero.power;
+            
+            const now = Date.now();
+            const cdTime = Math.max(10000, 60000 - ((myData.xp || 0) * 1000));
+            const timeLeft = (myData.lastPower + cdTime) - now;
+            
+            if (timeLeft > 0) {
+                document.getElementById('cd-timer').innerText = `Recarga: ${Math.ceil(timeLeft/1000)}s`;
+                document.querySelector('#power-panel button').disabled = true;
+                setTimeout(updateUI, 1000); 
+                return;
+            } else {
+                document.getElementById('cd-timer').innerText = "PRONTO";
+                document.querySelector('#power-panel button').disabled = false;
+            }
+
+            if (div.hasChildNodes() && div.dataset.hero === myData.role) return;
+            
+            div.innerHTML = '';
+            div.dataset.hero = myData.role;
+
+            if (hero.type === 'slider') {
+                div.innerHTML = `
+                    <label>Intensidade: <span id="slide-val">0</span>%</label>
+                    <input type="range" id="power-slider" min="0" max="${hero.max}" value="0" oninput="document.getElementById('slide-val').innerText=this.value">
+                `;
+            } else if (hero.type === 'target') {
+                div.innerHTML = `<input type="text" id="power-target" placeholder="Nome Exato do Alvo">`;
+            } else if (hero.type === 'select') {
+                div.innerHTML = `<select id="power-select">${hero.options.map(o => `<option>${o}</option>`).join('')}</select>`;
+            } else if (hero.type === 'target_select') {
+                div.innerHTML = `
+                    <input type="text" id="power-target" placeholder="Nome do Alvo">
+                    <select id="power-select" style="margin-top:5px;">${hero.options.map(o => `<option>${o}</option>`).join('')}</select>
+                `;
+            } else if (hero.type === 'target_msg') { 
+                div.innerHTML = `
+                    <input type="text" id="power-target" placeholder="Nome da Vítima">
+                    <input type="text" id="power-msg" placeholder="Poder oferecido..." style="margin-top:5px">
+                `;
+            } else if (hero.type === 'illusion_form') {
+                div.innerHTML = `
+                    <input type="text" id="fake-user" placeholder="Nome Falso">
+                    <input type="text" id="fake-msg" placeholder="Mensagem Falsa" style="margin-top:5px">
+                `;
+            } else if (hero.type === 'hero_select') { 
+                const otherHeroes = Object.keys(HEROES).filter(k => k !== myData.role);
+                div.innerHTML = `<select id="power-select">${otherHeroes.map(k => `<option value="${k}">${HEROES[k].name}</option>`).join('')}</select>`;
+            }
+        }
+
+        async function usePower() {
+            if (!myData.transformed || !myData.role) return;
+            
+            const heroKey = myData.role;
+            const heroData = HEROES[heroKey];
+            
+            const sliderVal = document.getElementById('power-slider') ? parseInt(document.getElementById('power-slider').value) : 0;
+            const targetName = document.getElementById('power-target') ? document.getElementById('power-target').value.trim() : null;
+            const selection = document.getElementById('power-select') ? document.getElementById('power-select').value : null;
+            
+            const extraMsg = document.getElementById('power-msg') ? document.getElementById('power-msg').value : 
+                            (document.getElementById('fake-msg') ? document.getElementById('fake-msg').value : null);
+            const fakeUser = document.getElementById('fake-user') ? document.getElementById('fake-user').value : null;
+
+            let logMsg = ""; 
+            let targetId = null;
+
+            if (targetName) {
+                targetId = await findUidByName(targetName);
+                if (!targetId && !heroData.type.includes('illusion') && heroKey !== 'goat') {
+                    alert("Usuário não encontrado!");
+                    return;
+                }
+            }
+
+            if (heroKey === 'ladybug') {
+                if (selection.includes('Purificar')) {
+                    await roomRef.child('globals').remove();
+                    const usersSnap = await roomRef.child('users').get();
+                    usersSnap.forEach(u => {
+                        roomRef.child(`users/${u.key}/status`).set({
+                            frozen: false, blind: false, dreaming: false, limbo: false, silenced: false, immune: false
+                        });
+                    });
+                    logMsg = "usou MIRACULOUS LADYBUG! Tudo voltou ao normal.";
+                } else {
+                    if (targetId) {
+                        roomRef.child(`users/${targetId}/status/immune`).set(true);
+                        logMsg = `criou um Talismã para ${targetName}.`;
+                    }
+                }
+            }
+            else if (heroKey === 'catnoir') {
+                logMsg = `usou Cataclismo em ${sliderVal}%!`;
+                if (sliderVal === 5) {
+                    roomRef.child('globals').remove(); 
+                    logMsg += " Um efeito foi destruído.";
+                } 
+                else if (sliderVal === 10) {
+                    await roomRef.child('messages').remove();
+                    logMsg += " O chat foi destruído!";
+                } 
+                else if (sliderVal === 50) {
+                    await roomRef.child('messages').remove();
+                    await roomRef.child('globals').remove();
+                    const randomUid = await getRandomUser();
+                    if (randomUid) roomRef.child(`users/${randomUid}/status/frozen`).set(true);
+                    logMsg += " Caos total!";
+                } 
+                else if (sliderVal === 100) {
+                    const victim = prompt("ATENÇÃO: Nome EXATO do alvo para destruir:");
+                    const vId = await findUidByName(victim);
+                    if (vId) {
+                        await roomRef.child(`users/${vId}`).remove();
+                        logMsg += ` ${victim} foi apagado da existência.`;
+                    } else {
+                        logMsg += " Mas errou!";
+                    }
+                } 
+                else {
+                    const chaos = Math.random();
+                    if (chaos < 0.33) {
+                        roomRef.child('globals/shake').set(true);
+                        setTimeout(() => roomRef.child('globals/shake').remove(), 3000);
+                    } else if (chaos < 0.66) {
+                        const rand = await getRandomUser();
+                        if(rand) roomRef.child(`users/${rand}/status/blind`).set(true);
+                    } else {
+                        const rand = await getRandomUser();
+                        if(rand) roomRef.child(`users/${rand}/status/silenced`).set(true);
+                    }
+                    logMsg += " A instabilidade causou efeitos aleatórios!";
+                }
+            }
+            else if (heroKey === 'queenbee') {
+                if (targetId) {
+                    roomRef.child(`users/${targetId}/status/frozen`).set(true);
+                    logMsg = `ferroou ${targetName}! Alvo paralisado.`;
+                }
+            }
+            else if (heroKey === 'renarouge') {
+                if (fakeUser && extraMsg) {
+                    roomRef.child('messages').push({
+                        sender: fakeUser,
+                        text: extraMsg,
+                        type: 'illusion',
+                        timestamp: Date.now()
+                    });
+                    logMsg = "criou uma Miragem..."; 
+                }
+            }
+            else if (heroKey === 'carapace') {
+                if (targetId) {
+                    roomRef.child(`users/${targetId}/status/shield`).set(true);
+                    logMsg = `aplicou o Casco em ${targetName}.`;
+                }
+            }
+            else if (heroKey === 'butterfly') {
+                if (targetId && extraMsg) {
+                    roomRef.child('messages').push({
+                        type: 'akuma_offer',
+                        targetId: targetId,
+                        sender: myData.name,
+                        powerName: extraMsg,
+                        text: `🦋 ${targetName}, ofereço o poder de "${extraMsg}". Aceita?`
+                    });
+                    logMsg = `enviou um Akuma para ${targetName}.`;
+                } else {
+                    if(targetId) {
+                        roomRef.child(`users/${targetId}`).update({ role: 'civil', transformed: false });
+                        logMsg = `removeu os poderes de ${targetName}.`;
+                    }
+                }
+            }
+            else if (heroKey === 'peacock') {
+                if (targetId) {
+                    const sentiId = `senti_${Date.now()}`;
+                    roomRef.child(`users/${sentiId}`).set({
+                        name: `${targetName} (Senti)`,
+                        role: 'civil', 
+                        location: 'Cidade',
+                        isSenti: true,
+                        controller: myId
+                    });
+                    logMsg = `criou um Sentimonstro de ${targetName}!`;
+                }
+            }
+            else if (heroKey === 'viperion') {
+                if (selection === 'Marcar Tempo') {
+                    roomRef.child(`snapshots/${roomId}`).set(Date.now());
+                    logMsg = "marcou o tempo!";
+                } else {
+                    const snap = await roomRef.child(`snapshots/${roomId}`).get();
+                    const timeMark = snap.val();
+                    if (timeMark) {
+                        const msgs = await roomRef.child('messages').get();
+                        msgs.forEach(m => {
+                            if (m.val().timestamp > timeMark) m.ref.remove();
+                        });
+                        logMsg = "usou Segunda Chance! O tempo voltou.";
+                    }
+                }
+            }
+            else if (heroKey === 'bunnyx') {
+                if (selection === 'Parar Tempo') {
+                    roomRef.child('globals/timeStopped').set(true);
+                    logMsg = "entrou na Toca. O tempo parou!";
+                } else if (selection === 'Resetar Total') {
+                    roomRef.child('messages').remove();
+                    roomRef.child('globals').remove();
+                    logMsg = "reescreveu a linha do tempo!";
+                } else {
+                    roomRef.child('globals/timeStopped').set(false);
+                    roomRef.child(`users/${myId}/status/intangible`).set(true);
+                    logMsg = "retomou o fluxo do tempo.";
+                }
+            }
+            else if (heroKey === 'pig') {
+                if (targetId) {
+                    roomRef.child(`users/${targetId}/status/dreaming`).set(true);
+                    logMsg = `usou Júbilo em ${targetName}.`;
+                }
+            }
+            else if (heroKey === 'horse') {
+                if (targetId) {
+                    roomRef.child(`users/${targetId}/status/limbo`).set(true);
+                    roomRef.child(`users/${targetId}/location`).set("LIMBO");
+                    logMsg = `usou Voyage! ${targetName} foi para o Limbo.`;
+                    setTimeout(async () => {
+                        const check = await roomRef.child(`users/${targetId}/status/limbo`).get();
+                        if(check.val() === true) {
+                            roomRef.child(`users/${targetId}`).remove();
+                            roomRef.child('messages').push({sender:'SISTEMA', text:`${targetName} se perdeu no Limbo.`});
+                        }
+                    }, 60000); 
+                }
+            }
+            else if (heroKey === 'ox') {
+                roomRef.child(`users/${myId}/status/immune`).set(true);
+                if(targetId) roomRef.child(`users/${targetId}/status/immune`).set(true);
+                logMsg = "ativou Resistência!";
+            }
+            else if (heroKey === 'monkey') {
+                if (targetId) {
+                    roomRef.child(`users/${targetId}/status`).update({ blind: true, silenced: true });
+                    logMsg = `usou Alvoroço em ${targetName}!`;
+                }
+            }
+            else if (heroKey === 'mouse') {
+                const msgs = await roomRef.child('messages').limitToLast(3).get();
+                if (msgs.exists()) {
+                    msgs.forEach(m => roomRef.child('messages').push(m.val()));
+                }
+                logMsg = "usou Multiplicidade!";
+            }
+            else if (heroKey === 'dog') {
+                if (targetId) {
+                    const sSnap = await roomRef.child(`users/${targetId}/status`).get();
+                    const status = sSnap.val();
+                    if (status) {
+                        roomRef.child(`users/${myId}/status`).update(status); 
+                        roomRef.child(`users/${targetId}/status`).remove(); 
+                        logMsg = `usou Buscar e roubou os efeitos de ${targetName}.`;
+                    }
+                }
+            }
+            else if (heroKey === 'goat') {
+                const item = selection; 
+                logMsg = `criou com Gênese: ${item.toUpperCase()}!`;
+
+                if (item === 'Borracha') {
+                    const lastMsg = await roomRef.child('messages').limitToLast(1).get();
+                    lastMsg.forEach(m => m.ref.remove());
+                    logMsg += " A última ação foi apagada.";
+                } 
+                else if (item === 'Algemas') {
+                    if (targetId) roomRef.child(`users/${targetId}/status/silenced`).set(true);
+                }
+                else if (item === 'Tinta') {
+                    roomRef.child(`users/${myId}/status/immune`).set(true); 
+                }
+                else if (item === 'Espelho') {
+                    roomRef.child(`users/${myId}/status/shield`).set(true); 
+                }
+                else if (item === 'Caderno') {
+                    roomRef.child('messages').push({ sender: 'SISTEMA', text: 'Chat seguro iniciado...', type: 'system' });
+                    roomRef.child('messages').push({ sender: 'Desconhecido', text: 'O plano começa agora.', timestamp: Date.now() });
+                }
+            }
+            else if (heroKey === 'tiger') {
+                if (sliderVal === 50) {
+                    roomRef.child('globals/shake').set(true);
+                    logMsg = "usou COLISÃO! O servidor tremeu.";
+                } else if (sliderVal === 100) {
+                    const v = prompt("Alvo da Colisão:");
+                    const vId = await findUidByName(v);
+                    if (vId) {
+                        roomRef.child(`users/${vId}`).remove();
+                        logMsg = `acertou ${v} com força total.`;
+                    }
+                }
+            }
+            else if (heroKey === 'dragon') {
+                if (selection === 'Vento') {
+                    roomRef.child('globals').remove(); 
+                    logMsg = "usou Vento e limpou o campo.";
+                } else if (selection === 'Raio') {
+                    const t = prompt("Alvo do Raio:");
+                    const tid = await findUidByName(t);
+                    if (tid) roomRef.child(`users/${tid}/status/silenced`).set(true);
+                    logMsg = "disparou um Raio!";
+                } else {
+                    roomRef.child('globals/waterInvert').set(true);
+                    logMsg = "usou Dragão de Água!";
+                }
+            }
+            else if (heroKey === 'rooster') {
+                roomRef.child(`users/${myId}`).update({ xp: (myData.xp||0) + 50 });
+                logMsg = `usou Sublimação para imitar ${HEROES[selection].name}!`;
+            }
+
+            if (logMsg) {
+                roomRef.child('messages').push({
+                    sender: 'SISTEMA',
+                    text: `⚡ ${myData.name} (${heroData.name}) ${logMsg}`,
+                    type: 'system',
+                    timestamp: Date.now()
+                });
+
+                roomRef.child(`users/${myId}`).update({
+                    lastPower: Date.now(),
+                    xp: (myData.xp || 0) + 10 
+                });
+
+                updateUI();
+            }
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('msg-input');
+            const txt = input.value.trim();
+            if (!txt) return;
+
+            if (myData.status?.silenced) return alert("Você está silenciado!");
+            if (myData.status?.frozen) return alert("Você está congelado!");
+            
+            const msgData = {
+                sender: myData.name,
+                text: txt,
+                role: myData.role,
+                timestamp: Date.now(),
+                dreamId: myData.status?.dreaming ? myId : null 
+            };
+
+            roomRef.child('messages').push(msgData);
+            input.value = '';
+        }
+
+        function renderMessage(key, msg) {
+            const box = document.getElementById('messages');
+            
+            if (msg.dreamId && msg.dreamId !== myId) return; 
+
+            const div = document.createElement('div');
+            div.id = `msg-${key}`;
+            
+            let className = 'msg';
+            if (msg.sender === myData.name) className += ' me';
+            if (msg.type === 'system') className += ' system';
+            if (msg.type === 'illusion') className += ' illusion';
+            if (msg.type === 'akuma_offer') className = 'msg system';
+            
+            if (msg.dreamId) div.style.opacity = "0.8";
+
+            if (msg.type === 'akuma_offer') {
+                if (msg.targetId === myId) {
+                    div.innerHTML = `
+                        ${msg.text}<br>
+                        <button onclick="acceptAkuma('${msg.powerName}')" style="margin-top:5px; background:purple; color:white;">ACEITAR PODER</button>
+                    `;
+                } else {
+                    div.innerHTML = `Hawk Moth ofereceu um poder...`;
+                }
+            } 
+            else if (msg.type === 'illusion') {
+                div.innerHTML = `<strong>${msg.sender}</strong>: ${msg.text}`;
+                div.onclick = function() {
+                    this.innerHTML = "<em>(Miragem desfeita...)</em>";
+                    this.style.border = "none";
+                    this.style.color = "#e67e22";
+                }
+            }
+            else if (msg.type !== 'system') {
+                div.innerHTML = `<strong>${msg.sender}</strong>: ${msg.text}`;
+            } else {
+                div.innerHTML = msg.text;
+            }
+
+            div.className = className;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function acceptAkuma(powerName) {
+            alert(`Você aceitou o poder: ${powerName}! (XP +20)`);
+            roomRef.child(`users/${myId}`).update({ xp: (myData.xp||0) + 20 });
+            roomRef.child('messages').push({ sender:'SISTEMA', type:'system', text:`🦋 ${myData.name} aceitou o pacto e foi Akumatizado!` });
+        }
+
+        function handleEffects(status) {
+            if(!status) return;
+            const app = document.getElementById('app');
+            const overlay = document.getElementById('spectator-overlay');
+
+            app.className = '';
+            overlay.style.display = 'none';
+
+            if (status.blind) app.classList.add('blind');
+            if (status.dreaming) app.classList.add('dreaming');
+            if (status.limbo) app.classList.add('limbo-screen');
+            
+            if (myData.role === 'bunnyx' && myData.status?.intangible) {
+                overlay.style.display = 'flex';
+            }
+        }
+
+        async function findUidByName(name) {
+            if(!name) return null;
+            const snap = await roomRef.child('users').get();
+            let found = null;
+            snap.forEach(u => {
+                if(u.val().name.toLowerCase() === name.toLowerCase()) found = u.key;
+            });
+            if(!found) alert("Usuário não encontrado!");
+            return found;
+        }
+
+        async function getRandomUser() {
+            const snap = await roomRef.child('users').get();
+            const keys = Object.keys(snap.val());
+            return keys.length ? keys[Math.floor(Math.random()*keys.length)] : null;
+        }
+
+        function updateLocation() {
+            const loc = document.getElementById('location-select').value;
+            roomRef.child(`users/${myId}/location`).set(loc);
+        }
+
+        setInterval(() => {
+            if(myData.role && myData.role !== 'civil') updateUI();
+        }, 5000);
+    </script>
+</body>
+</html>
